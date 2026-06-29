@@ -556,8 +556,7 @@ input.invalid,select.invalid,textarea.invalid{
       <div class="pstep" data-pstep="1"><div class="pdot">1</div><div class="plabel">Personal</div></div>
       <div class="pstep" data-pstep="2"><div class="pdot">2</div><div class="plabel">Family &amp; Education</div></div>
       <div class="pstep" data-pstep="3"><div class="pdot">3</div><div class="plabel">Work History</div></div>
-      <div class="pstep" data-pstep="4"><div class="pdot">4</div><div class="plabel">Career</div></div>
-      <div class="pstep" data-pstep="5"><div class="pdot">5</div><div class="plabel">General &amp; References</div></div>
+      <div class="pstep" data-pstep="4"><div class="pdot">4</div><div class="plabel">General &amp; References</div></div>
     </div>
   </div>
 
@@ -759,40 +758,6 @@ input.invalid,select.invalid,textarea.invalid{
       </div>
 
       <div class="card">
-        <span class="section-title">Physical Data</span>
-        <p class="section-note">&nbsp;</p>
-        <div class="grid grid-2">
-          <div class="field"><label class="flabel" for="f-height">Height</label><input type="text" id="f-height" placeholder="e.g. 175 cm"></div>
-          <div class="field"><label class="flabel" for="f-weight">Weight</label><input type="text" id="f-weight" placeholder="e.g. 70 kg"></div>
-        </div>
-        <div class="grid grid-2">
-          <div class="field"><label class="flabel" for="f-glasses">Power of Glasses</label><input type="text" id="f-glasses" placeholder="e.g. -1.5 / Nil"></div>
-          <div class="field"><label class="flabel" for="f-disability">Physical Disability (if any)</label><input type="text" id="f-disability" placeholder="Specify if any, else leave blank"></div>
-        </div>
-        <div class="section-divider"></div>
-        <p class="section-note" style="margin-top:0;font-weight:600;color:var(--text);">Most Recent Illness</p>
-        <div class="grid grid-3">
-          <div class="field"><label class="flabel" for="f-illness-from">From</label><input type="date" id="f-illness-from"></div>
-          <div class="field"><label class="flabel" for="f-illness-to">To</label><input type="date" id="f-illness-to"></div>
-          <div class="field"><label class="flabel" for="f-illness-days">No. of Days</label><input type="number" id="f-illness-days" min="0" placeholder="e.g. 5"></div>
-        </div>
-        <div class="field"><label class="flabel" for="f-illness-nature">Nature of Illness</label><input type="text" id="f-illness-nature" placeholder="e.g. Viral fever (leave blank if none)"></div>
-        <div class="section-divider"></div>
-        <label class="flabel">Chronic Illness</label>
-        <div class="pill-group" id="chronic-pills">
-          <button type="button" class="pill" data-chronic="diabetes">Diabetes</button>
-          <button type="button" class="pill" data-chronic="high_bp">High B.P.</button>
-          <button type="button" class="pill" data-chronic="heart_disease">Heart Disease</button>
-          <button type="button" class="pill" data-chronic="asthma">Asthma</button>
-          <button type="button" class="pill" data-chronic="other">Other</button>
-        </div>
-        <div class="reveal" id="chronic-other-wrap" style="margin-top:14px;max-width:360px;">
-          <label class="flabel" for="f-chronic-other">Please specify</label>
-          <input type="text" id="f-chronic-other" placeholder="Please specify the condition">
-        </div>
-      </div>
-
-      <div class="card">
         <span class="section-title">Social Media Presence</span>
         <p class="section-note">Optional.</p>
         <div class="field">
@@ -810,41 +775,8 @@ input.invalid,select.invalid,textarea.invalid{
       </div>
     </section>
 
-    <!-- ===================== STEP 4: CAREER ===================== -->
+    <!-- ===================== STEP 4: GENERAL & REFERENCES ===================== -->
     <section class="step-panel" data-step="4">
-      <h1 class="step-title">Career</h1>
-      <p class="step-intro">Take your time — these help us understand you better.</p>
-      <div class="card">
-        <div class="field">
-          <label class="flabel" for="f-noteworthy">Noteworthy Contributions</label>
-          <p class="section-note" style="margin-top:0;">Please describe specific contributions you consider noteworthy during your career so far.</p>
-          <textarea id="f-noteworthy" rows="5" placeholder="Describe specific achievements or contributions you are proud of…"></textarea>
-        </div>
-        <div class="field">
-          <label class="flabel" for="f-vision">5-Year Vision</label>
-          <p class="section-note" style="margin-top:0;">What is your career plan and where do you see yourself in the next 5 years?</p>
-          <textarea id="f-vision" rows="5" placeholder="Describe your career plan and where you see yourself in 5 years…"></textarea>
-        </div>
-        <div class="field">
-          <label class="flabel" for="f-personal-dev">Personal Development</label>
-          <p class="section-note" style="margin-top:0;">Who are the most important people in your Personal Development?</p>
-          <textarea id="f-personal-dev" rows="4" placeholder="Name the people and explain how they shaped you personally…"></textarea>
-        </div>
-        <div class="field">
-          <label class="flabel" for="f-professional-dev">Professional Development</label>
-          <p class="section-note" style="margin-top:0;">Who are the most important people in your Professional Development?</p>
-          <textarea id="f-professional-dev" rows="4" placeholder="Name the people and explain how they shaped you professionally…"></textarea>
-        </div>
-        <div class="field">
-          <label class="flabel" for="f-rolemodel">Role Model</label>
-          <p class="section-note" style="margin-top:0;">Name one person of National or International prominence who you consider your role model, and explain why.</p>
-          <textarea id="f-rolemodel" rows="5" placeholder="Name a person of national / international prominence and explain why…"></textarea>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== STEP 5: GENERAL & REFERENCES ===================== -->
-    <section class="step-panel" data-step="5">
       <h1 class="step-title">General &amp; References</h1>
       <p class="step-intro">Final details before you submit.</p>
       <div class="step-banner" data-banner="5">Please fill in the required fields before continuing.</div>
@@ -1006,9 +938,8 @@ const STATE = {
   email: null,
   position: null,
   currentStep: 1,
-  totalSteps: 5,
+  totalSteps: 4,
   photoBase64: null,
-  chronic: { diabetes:false, high_bp:false, heart_disease:false, asthma:false, other:false },
   yn: { 'prev-interview':null, parttime:null, court:null, bond:null },
   activeEmpTab: 'present',
   openedAtMs: null,
@@ -1272,7 +1203,7 @@ function goToStep(n){
   });
   $('progress-fill').style.width = ((n-1)/(STATE.totalSteps-1)*86) + '%';
 
-  const labels = ['Personal','Family & Education','Work History','Career','General & References'];
+  const labels = ['Personal','Family & Education','Work History','General & References'];
   $('mobile-step-label').textContent = `Step ${n} of ${STATE.totalSteps} — ${labels[n-1]}`;
 
   // buttons
@@ -1390,14 +1321,8 @@ function buildEmploymentPanels(){
         <input type="text" data-emp-key="job_location" placeholder="e.g. Gurgaon"></div>
       <div class="field"><label class="flabel">Supervisor Name &amp; Designation</label>
         <input type="text" data-emp-key="supervisor" placeholder="e.g. Mr. Khanna, Director"></div>
-      <div class="grid grid-3">
-        <div class="field"><label class="flabel">Basic (₹/PM)</label>
-          <input type="number" min="0" data-emp-key="salary_basic" data-emp-sal="${t.key}" placeholder="e.g. 55000"></div>
-        <div class="field"><label class="flabel">Allowances (₹/PM)</label>
-          <input type="number" min="0" data-emp-key="salary_allowances" data-emp-sal="${t.key}" placeholder="e.g. 10000"></div>
-        <div class="field"><label class="flabel">Total (₹/PM)</label>
-          <input type="text" class="readonly" readonly tabindex="-1" data-emp-key="salary_total" id="emp-sal-${t.key}" placeholder="Auto-calculated"></div>
-      </div>
+      <div class="field" style="max-width:320px;"><label class="flabel">${t.key === 'present' ? 'Current CTC (₹/PM)' : 'Previous CTC (₹/PM)'}</label>
+        <input type="number" min="0" data-emp-key="ctc" placeholder="e.g. 65000"></div>
       <div class="field"><label class="flabel">Job Description</label>
         <textarea rows="3" data-emp-key="job_description" placeholder="Briefly describe your role and responsibilities…"></textarea></div>
       ${t.reason ? `<div class="field"><label class="flabel">Reason for Leaving</label>
@@ -1406,11 +1331,9 @@ function buildEmploymentPanels(){
     wrap.appendChild(p);
   });
 
-  // duration + salary auto-calc
+  // duration auto-calc
   wrap.querySelectorAll('[data-emp-dur]').forEach(el =>
     el.addEventListener('change', () => calcDuration(el.getAttribute('data-emp-dur'))));
-  wrap.querySelectorAll('[data-emp-sal]').forEach(el =>
-    el.addEventListener('input', () => calcSalary(el.getAttribute('data-emp-sal'))));
 }
 
 function empPanel(key){ return document.querySelector(`[data-emp-panel="${key}"]`); }
@@ -1430,13 +1353,6 @@ function calcDuration(key){
   out.value = `${y} yr ${mo} mo`;
 }
 
-function calcSalary(key){
-  const p = empPanel(key);
-  const b = parseFloat(p.querySelector('[data-emp-key="salary_basic"]').value) || 0;
-  const a = parseFloat(p.querySelector('[data-emp-key="salary_allowances"]').value) || 0;
-  $('emp-sal-'+key).value = (b+a) ? (b+a).toLocaleString('en-IN') : '';
-}
-
 function collectEmployment(){
   const out = [];
   EMP_TYPES.forEach(t => {
@@ -1446,7 +1362,7 @@ function collectEmployment(){
     p.querySelectorAll('[data-emp-key]').forEach(el => {
       const v = el.value.trim();
       obj[el.getAttribute('data-emp-key')] = v;
-      if(v && el.getAttribute('data-emp-key') !== 'duration' && el.getAttribute('data-emp-key') !== 'salary_total') hasValue = true;
+      if(v && el.getAttribute('data-emp-key') !== 'duration') hasValue = true;
     });
     if(!t.reason) obj.reason_leaving = '';
     if(hasValue) out.push(obj);
@@ -1505,15 +1421,6 @@ function wireStaticHandlers(){
       document.querySelectorAll('.emp-tab').forEach(t => t.classList.toggle('active', t === tab));
       document.querySelectorAll('.emp-panel').forEach(p =>
         p.classList.toggle('active', p.getAttribute('data-emp-panel') === k));
-    }));
-
-  // Chronic pills
-  document.querySelectorAll('#chronic-pills .pill').forEach(pill =>
-    pill.addEventListener('click', () => {
-      const k = pill.getAttribute('data-chronic');
-      STATE.chronic[k] = !STATE.chronic[k];
-      pill.classList.toggle('selected', STATE.chronic[k]);
-      if(k === 'other') $('chronic-other-wrap').classList.toggle('show', STATE.chronic.other);
     }));
 
   // Yes/No toggles
@@ -1613,7 +1520,7 @@ function markError(id, show){
 
 function validateStep(step){
   if(step === 1) return validateStep1();
-  if(step === 5) return validateStep5();
+  if(step === 4) return validateStep5();
   return true;
 }
 
@@ -1688,28 +1595,10 @@ function collectData(){
 
     employment: collectEmployment(),
     extracurricular: collectDyn('extracurricular'),
-    height: val('f-height'),
-    weight: val('f-weight'),
-    power_of_glasses: val('f-glasses'),
-    physical_disability: val('f-disability'),
-    illness_from: val('f-illness-from'),
-    illness_to: val('f-illness-to'),
-    illness_days: val('f-illness-days'),
-    illness_nature: val('f-illness-nature'),
-    chronic_diabetes: STATE.chronic.diabetes,
-    chronic_high_bp: STATE.chronic.high_bp,
-    chronic_heart_disease: STATE.chronic.heart_disease,
-    chronic_asthma: STATE.chronic.asthma,
-    chronic_other: STATE.chronic.other ? val('f-chronic-other') : '',
     linkedin_profile: val('f-linkedin'),
     twitter_profile: val('f-twitter'),
     facebook_profile: val('f-facebook'),
 
-    noteworthy_contributions: val('f-noteworthy'),
-    career_plan_5yr: val('f-vision'),
-    important_personal_dev: val('f-personal-dev'),
-    important_professional_dev: val('f-professional-dev'),
-    role_model: val('f-rolemodel'),
 
     prev_interviewed_org: STATE.yn['prev-interview'] === 'yes',
     prev_interview_details: {
@@ -1771,7 +1660,7 @@ function showSubmitError(){
   banner.className = 'step-banner show';
   banner.style.margin = '0 0 16px';
   banner.textContent = 'Submission failed. Please check your connection and try again, or contact HR.';
-  const panel = document.querySelector('.step-panel[data-step="5"]');
+  const panel = document.querySelector('.step-panel[data-step="4"]');
   panel.insertBefore(banner, panel.firstChild);
   banner.scrollIntoView({ behavior:'smooth', block:'center' });
 }
