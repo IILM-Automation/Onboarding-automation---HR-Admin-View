@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Employment Application</title>
+<style>
+/* ============================================================
+   THEME + NEUTRAL PALETTE
+   Org theme is applied by toggling body.org-bts / body.org-iilm
+   ============================================================ */
+:root{
+  --bg:#F7F8FA;
+  --surface:#FFFFFF;
+  --text:#111827;
+  --muted:#6B7280;
+  --border:#E5E7EB;
+  --error:#DC2626;
+  --success:#16A34A;
+  /* neutral fallback theme (org unknown — loading state) */
+  --primary:#374151;
+  --accent:#9CA3AF;
+  --primary-rgb:55,65,81;
+  --accent-rgb:156,163,175;
+}
+body.org-bts{
+  --primary:#1E50A2;
+  --accent:#D97706;
+  --primary-rgb:30,80,162;
+  --accent-rgb:217,119,6;
+}
+body.org-iilm{
+  --primary:#1A2B5E;
+  --accent:#F59E0B;
+  --primary-rgb:26,43,94;
+  --accent-rgb:245,158,11;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-text-size-adjust:100%;
+}
+
+/* ============================================================
+   PAGE STATE VISIBILITY
+   ============================================================ */
+[data-state]{display:none;}
+[data-state].is-active{display:block;}
+#state-loading.is-active,
+#state-error.is-active{display:flex;}
+
+/* ============================================================
+   STATE 1 — LOADING (org-neutral)
+   ============================================================ */
+#state-loading{
+  min-height:100vh;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:18px;
+  color:var(--muted);
+}
+.spinner{
+  width:46px;height:46px;
+  border:4px solid var(--border);
+  border-top-color:var(--primary);
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ============================================================
+   STATE 2 — TOKEN ERROR + STATE 5 — SUCCESS share card layout
+   ============================================================ */
+#state-error{
+  min-height:100vh;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.centered-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:18px;
+  max-width:440px;
+  width:100%;
+  padding:40px 32px;
+  text-align:center;
+  box-shadow:0 8px 30px rgba(0,0,0,0.06);
+}
+.icon-circle{
+  width:88px;height:88px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:42px;
+  margin:0 auto 22px;
+  background:rgba(var(--primary-rgb),0.08);
+}
+.icon-circle.success{background:rgba(22,163,74,0.12);}
+.icon-circle.error{background:rgba(220,38,38,0.10);}
+.centered-card h2{font-size:22px;font-weight:700;margin:0 0 10px;}
+.centered-card p{color:var(--muted);margin:0 0 8px;}
+.centered-card .org-line{
+  font-weight:700;color:var(--primary);letter-spacing:0.5px;
+  text-transform:uppercase;font-size:13px;margin-bottom:18px;
+}
+.contact-link{
+  display:inline-block;margin-top:18px;
+  color:var(--primary);font-weight:600;text-decoration:none;
+  border-bottom:1px solid currentColor;
+}
+.org-badge{
+  display:inline-block;
+  background:var(--primary);color:#fff;
+  font-size:12px;font-weight:700;letter-spacing:0.5px;
+  padding:5px 14px;border-radius:999px;margin-top:6px;
+}
+
+/* ============================================================
+   STATE 5 — SUCCESS
+   ============================================================ */
+#state-success{min-height:100vh;display:none;}
+#state-success.is-active{display:flex;align-items:center;justify-content:center;padding:24px;}
+
+/* ============================================================
+   STATE 3 — FORM
+   ============================================================ */
+/* --- Sticky Header --- */
+header.app-header{
+  position:sticky;top:0;z-index:40;
+  background:var(--primary);
+  color:#fff;
+}
+.header-bar{
+  max-width:760px;margin:0 auto;
+  padding:12px 24px;
+  display:flex;align-items:center;gap:14px;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;}
+.logo-mark{
+  width:38px;height:38px;border-radius:9px;flex:none;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:15px;letter-spacing:0.5px;
+}
+.brand-text{min-width:0;}
+.brand-org{font-weight:800;font-size:15px;line-height:1.1;white-space:nowrap;}
+.brand-sub{font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.6px;}
+.header-spacer{flex:1;}
+.email-chip{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,0.14);
+  color:rgba(255,255,255,0.92);
+  font-size:12.5px;font-weight:500;
+  padding:6px 12px;border-radius:999px;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.email-chip .lock{font-size:11px;opacity:0.8;}
+
+.timer-row{
+  max-width:760px;margin:0 auto;
+  padding:0 24px 10px;
+}
+.timer-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.14);
+  color:#fff;
+  font-size:12px;font-weight:600;letter-spacing:0.4px;
+  padding:5px 12px;border-radius:999px;
+  transition:background 0.3s,color 0.3s;
+}
+.timer-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success);}
+.timer-pill.warn{background:#FEF3C7;color:#92400E;}
+.timer-pill.warn .dot{background:#D97706;}
+.timer-pill.danger{background:#FEE2E2;color:#991B1B;}
+.timer-pill.danger .dot{background:var(--error);}
+
+/* --- Warning banner --- */
+.session-warning{
+  display:none;
+  background:#FEF3C7;color:#92400E;
+  text-align:center;font-size:14px;font-weight:600;
+  padding:10px 16px;
+  border-bottom:1px solid #FDE68A;
+}
+.session-warning.show{display:block;}
+
+/* --- Progress indicator --- */
+.progress-wrap{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:18px 24px;
+}
+.progress-dots{
+  max-width:760px;margin:0 auto;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  position:relative;
+}
+.progress-track{
+  position:absolute;top:13px;left:0;right:0;height:3px;
+  background:var(--border);z-index:0;margin:0 7%;
+}
+.progress-fill{
+  position:absolute;top:13px;left:0;height:3px;
+  background:var(--primary);z-index:1;margin-left:7%;
+  transition:width 0.3s ease;
+}
+.pstep{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  flex:1;text-align:center;
+}
+.pdot{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--surface);
+  border:2.5px solid var(--border);
+  color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:700;
+  transition:all 0.3s;
+}
+.pstep.active .pdot{border-color:var(--primary);color:var(--primary);background:#fff;}
+.pstep.done .pdot{background:var(--primary);border-color:var(--primary);color:#fff;}
+.plabel{font-size:11px;font-weight:600;color:var(--muted);max-width:80px;}
+.pstep.active .plabel{color:var(--primary);}
+.mobile-step-label{display:none;}
+
+/* --- Form container --- */
+.form-container{
+  max-width:760px;margin:0 auto;
+  padding:28px 40px 120px;
+}
+.step-panel{display:none;animation:fade 0.2s ease;}
+.step-panel.active{display:block;}
+@keyframes fade{from{opacity:0;}to{opacity:1;}}
+
+.step-title{font-size:22px;font-weight:700;margin:0 0 4px;}
+.step-intro{color:var(--muted);margin:0 0 24px;font-size:14.5px;}
+
+/* --- Cards / sections --- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:24px;
+  margin-bottom:24px;
+}
+.section-title{
+  font-size:20px;font-weight:700;margin:0 0 4px;
+  display:inline-block;
+}
+.section-title::after{
+  content:"";display:block;height:3px;width:46px;
+  background:var(--accent);border-radius:3px;margin-top:6px;
+}
+.section-note{font-size:13px;color:var(--muted);margin:6px 0 18px;}
+.section-divider{height:1px;background:var(--border);margin:32px 0;}
+
+/* --- Form fields --- */
+.field{margin-bottom:20px;}
+label.flabel{
+  display:block;
+  font-size:12px;text-transform:uppercase;letter-spacing:0.5px;
+  font-weight:600;color:var(--text);margin-bottom:7px;
+}
+label.flabel .req{color:var(--error);margin-left:2px;}
+label.flabel .lock{font-size:11px;color:var(--muted);margin-left:4px;}
+
+input[type=text],input[type=tel],input[type=email],input[type=date],
+input[type=number],input[type=url],select,textarea{
+  width:100%;
+  font-family:inherit;font-size:16px;
+  color:var(--text);background:#fff;
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  padding:12px 16px;
+  outline:none;
+  transition:border-color 0.15s,box-shadow 0.15s;
+}
+input:not(textarea):not([type=checkbox]),select{height:48px;}
+textarea{resize:vertical;line-height:1.5;min-height:84px;}
+input:focus,select:focus,textarea:focus{
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(var(--primary-rgb),0.12);
+}
+input.locked,select.locked,textarea.locked{
+  background:#F3F4F6;color:var(--muted);cursor:not-allowed;
+}
+input.readonly,input[readonly]{background:#F9FAFB;color:var(--muted);}
+input.invalid,select.invalid,textarea.invalid{
+  border-color:var(--error);
+  box-shadow:0 0 0 3px rgba(220,38,38,0.10);
+}
+.field-error{
+  display:none;color:var(--error);font-size:12.5px;font-weight:500;margin-top:6px;
+}
+.field-error.show{display:block;}
+
+/* --- Grids --- */
+.grid{display:grid;gap:18px;}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-3{grid-template-columns:1fr 1fr 1fr;}
+
+/* --- Validation summary banner --- */
+.step-banner{
+  display:none;
+  background:#FEE2E2;color:#991B1B;
+  border:1px solid #FCA5A5;border-radius:10px;
+  padding:12px 16px;font-size:14px;font-weight:600;margin-bottom:20px;
+}
+.step-banner.show{display:block;}
+
+/* --- Checkbox / inline --- */
+.inline-check{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:14.5px;}
+.inline-check input{width:18px;height:18px;accent-color:var(--primary);}
+
+/* --- Dynamic rows --- */
+.dyn-row{
+  position:relative;
+  border:1px solid var(--border);
+  border-radius:8px;background:#fff;
+  padding:18px 16px 4px;margin-bottom:14px;
+}
+.dyn-row-num{
+  position:absolute;top:-9px;left:14px;
+  background:#fff;padding:0 6px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;
+  font-weight:700;color:var(--muted);
+}
+.dyn-remove{
+  position:absolute;top:10px;right:10px;
+  width:26px;height:26px;border-radius:50%;
+  border:none;background:transparent;color:var(--muted);
+  font-size:19px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.15s,color 0.15s;
+}
+.dyn-remove:hover{background:#FEE2E2;color:var(--error);}
+.btn-add{
+  width:100%;
+  border:1.5px dashed var(--primary);
+  color:var(--primary);background:transparent;
+  border-radius:10px;padding:12px;
+  font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  transition:background 0.15s;
+}
+.btn-add:hover{background:rgba(var(--primary-rgb),0.05);}
+.btn-add:disabled{opacity:0.45;cursor:not-allowed;}
+
+/* --- Photo upload --- */
+.photo-zone{
+  border:2px dashed rgba(var(--primary-rgb),0.4);
+  border-radius:12px;
+  padding:30px 20px;text-align:center;cursor:pointer;
+  transition:background 0.15s,border-color 0.15s;
+}
+.photo-zone:hover,.photo-zone.dragover{
+  background:rgba(var(--primary-rgb),0.05);
+  border-color:var(--primary);
+}
+.photo-zone .pz-icon{font-size:34px;}
+.photo-zone .pz-main{font-weight:600;margin-top:8px;}
+.photo-zone .pz-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.photo-preview{
+  display:none;align-items:center;gap:16px;
+  border:1px solid var(--border);border-radius:12px;padding:16px;
+}
+.photo-preview.show{display:flex;}
+.photo-preview img{
+  width:100px;height:100px;border-radius:50%;object-fit:cover;
+  border:3px solid var(--primary);flex:none;
+}
+.photo-meta{flex:1;min-width:0;}
+.photo-meta .pname{font-weight:600;word-break:break-all;}
+.photo-meta .psize{font-size:13px;color:var(--muted);}
+.photo-remove{
+  border:none;background:#FEE2E2;color:var(--error);
+  width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;flex:none;
+}
+
+/* --- Pills (chronic / yes-no toggles) --- */
+.pill-group{display:flex;flex-wrap:wrap;gap:10px;}
+.pill{
+  border:1.5px solid var(--border);background:#fff;
+  border-radius:999px;padding:9px 18px;
+  font-family:inherit;font-size:14px;font-weight:600;color:var(--text);
+  cursor:pointer;transition:all 0.15s;
+}
+.pill:hover{border-color:var(--primary);}
+.pill.selected{
+  background:var(--primary);border-color:var(--primary);color:#fff;
+}
+.yn-toggle{display:flex;gap:10px;}
+.yn-toggle .pill{min-width:74px;text-align:center;}
+.reveal{display:none;margin-top:16px;}
+.reveal.show{display:block;}
+
+/* --- Employment tabs --- */
+.emp-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.emp-tab{
+  flex:1;min-width:120px;
+  border:1.5px solid var(--border);background:#fff;
+  border-radius:10px;padding:11px 12px;
+  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--muted);
+  cursor:pointer;transition:all 0.15s;text-align:center;
+}
+.emp-tab.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+.emp-panel{display:none;}
+.emp-panel.active{display:block;}
+
+/* --- Declaration --- */
+.declaration{
+  background:rgba(var(--accent-rgb),0.08);
+  border:1px solid rgba(var(--accent-rgb),0.35);
+  border-radius:12px;padding:20px;
+  font-size:14.5px;color:var(--text);margin-bottom:20px;line-height:1.55;
+}
+
+/* --- Nav buttons --- */
+.nav-bar{
+  max-width:760px;margin:0 auto;
+  display:flex;gap:14px;padding:0 40px;
+}
+.btn{
+  font-family:inherit;font-weight:600;font-size:15px;
+  height:48px;border-radius:12px;cursor:pointer;border:none;
+  padding:0 26px;transition:opacity 0.15s,transform 0.05s;
+}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--primary);color:#fff;flex:1;}
+.btn-outline{background:#fff;border:1.5px solid var(--border);color:var(--muted);}
+.btn-submit{background:var(--accent);color:#fff;flex:1;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* ============================================================
+   STATE 4 — SESSION EXPIRED OVERLAY
+   ============================================================ */
+.lock-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:rgba(17,24,39,0.55);
+  align-items:center;justify-content:center;padding:24px;
+  backdrop-filter:blur(2px);
+}
+.lock-overlay.show{display:flex;}
+.form-locked{pointer-events:none;opacity:0.6;}
+
+/* ============================================================
+   SUBMIT LOADING OVERLAY
+   ============================================================ */
+.submit-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:300;
+  background:rgba(var(--primary-rgb),0.92);
+  color:#fff;
+  align-items:center;justify-content:center;flex-direction:column;gap:18px;
+}
+.submit-overlay.show{display:flex;}
+.submit-overlay .spinner{border-color:rgba(255,255,255,0.3);border-top-color:#fff;}
+.submit-overlay p{font-weight:600;font-size:16px;}
+
+/* --- accessible visually hidden --- */
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+/* ============================================================
+   RESPONSIVE — mobile ≤600px
+   ============================================================ */
+@media (max-width:600px){
+  .form-container{padding:24px 20px 110px;}
+  .header-bar{padding:11px 16px;gap:10px;}
+  .timer-row{padding:0 16px 10px;}
+  .progress-wrap{padding:14px 16px;}
+  .progress-dots{display:none;}
+  .mobile-step-label{
+    display:block;text-align:center;
+    font-size:14px;font-weight:700;color:var(--primary);
+  }
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  .email-chip{max-width:130px;}
+  .emp-tabs{flex-direction:column;}
+  .emp-tab{min-width:0;text-align:left;}
+  /* sticky nav at bottom on mobile */
+  .nav-bar{
+    position:fixed;bottom:0;left:0;right:0;z-index:50;
+    background:var(--surface);
+    border-top:1px solid var(--border);
+    padding:12px 16px;margin:0;max-width:none;
+    box-shadow:0 -4px 16px rgba(0,0,0,0.06);
+  }
+  .btn{padding:0 16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ========================= STATE 1: LOADING ========================= -->
+<div id="state-loading" data-state="loading" class="is-active">
+  <div class="spinner" role="status" aria-label="Loading"></div>
+  <div>Validating your link…</div>
+</div>
+
+<!-- ========================= STATE 2: TOKEN ERROR ========================= -->
+<div id="state-error" data-state="error">
+  <div class="centered-card">
+    <div class="icon-circle error" id="err-icon">⚠️</div>
+    <div class="org-line" id="err-org" style="display:none;"></div>
+    <h2 id="err-title">Something went wrong</h2>
+    <p id="err-msg"></p>
+    <a class="contact-link" id="err-contact" href="mailto:hr@iilm.edu">Contact HR</a>
+  </div>
+</div>
+
+<!-- ========================= STATE 3: FORM ========================= -->
+<div id="state-form" data-state="form">
+  <header class="app-header">
+    <div class="header-bar">
+      <div class="brand">
+        <div class="logo-mark" id="logo-mark">—</div>
+        <div class="brand-text">
+          <div class="brand-org" id="brand-org">Organization</div>
+          <div class="brand-sub">Employment Application</div>
+        </div>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="email-chip" id="email-chip" title="">
+        <span class="lock" aria-hidden="true">🔒</span>
+        <span id="email-chip-text">—</span>
+      </div>
+    </div>
+    <div class="timer-row">
+      <span class="timer-pill" id="timer-pill" role="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="timer-text">SESSION ACTIVE</span>
+      </span>
+    </div>
+  </header>
+
+  <div class="session-warning" id="session-warning" role="alert"></div>
+  <div class="sr-only" aria-live="polite" id="timer-live"></div>
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="mobile-step-label" id="mobile-step-label"></div>
+    <div class="progress-dots" id="progress-dots">
+      <div class="progress-track"></div>
+      <div class="progress-fill" id="progress-fill"></div>
+      <div class="pstep" data-pstep="1"><div class="pdot">1</div><div class="plabel">Personal</div></div>
+      <div class="pstep" data-pstep="2"><div class="pdot">2</div><div class="plabel">Family &amp; Education</div></div>
+      <div class="pstep" data-pstep="3"><div class="pdot">3</div><div class="plabel">Work History</div></div>
+      <div class="pstep" data-pstep="4"><div class="pdot">4</div><div class="plabel">Career</div></div>
+      <div class="pstep" data-pstep="5"><div class="pdot">5</div><div class="plabel">General &amp; References</div></div>
+    </div>
+  </div>
+
+  <form id="app-form" autocomplete="on" novalidate>
+  <div class="form-container">
+
+    <!-- ===================== STEP 1: PERSONAL ===================== -->
+    <section class="step-panel active" data-step="1">
+      <h1 class="step-title">Personal Information</h1>
+      <p class="step-intro">Fields marked with <span style="color:var(--error)">*</span> are required.</p>
+      <div class="step-banner" data-banner="1">Please fill in the required fields before continuing.</div>
+
+      <div class="card">
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="flabel" for="f-org">Organization <span class="lock">🔒</span></label>
+            <input type="text" id="f-org" class="locked" readonly tabindex="-1">
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-position">Position Applied For <span class="lock">🔒</span></label>
+            <input type="text" id="f-position" class="locked" readonly tabindex="-1">
+          </div>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-email">Email <span class="lock">🔒</span></label>
+          <input type="email" id="f-email" class="locked" readonly tabindex="-1" aria-describedby="e-email">
+          <div class="field-error" id="e-email">Please enter a valid email.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field" style="max-width:220px;">
+          <label class="flabel" for="f-salutation">Title <span class="req">*</span></label>
+          <select id="f-salutation" aria-describedby="e-salutation">
+            <option value="">Select…</option>
+            <option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Dr.</option>
+          </select>
+          <div class="field-error" id="e-salutation">Please select a title.</div>
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label class="flabel" for="f-first">First Name <span class="req">*</span></label>
+            <input type="text" id="f-first" placeholder="e.g. Rohan" aria-describedby="e-first">
+            <div class="field-error" id="e-first">First name is required.</div>
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-middle">Middle Name</label>
+            <input type="text" id="f-middle" placeholder="e.g. Kumar (leave blank if none)">
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-surname">Surname <span class="req">*</span></label>
+            <input type="text" id="f-surname" placeholder="e.g. Mehta" aria-describedby="e-surname">
+            <div class="field-error" id="e-surname">Surname is required.</div>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="flabel" for="f-dob">Date of Birth <span class="req">*</span></label>
+            <input type="date" id="f-dob" aria-describedby="e-dob">
+            <div class="field-error" id="e-dob">Date of birth is required.</div>
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-age">Age</label>
+            <input type="text" id="f-age" class="readonly" readonly tabindex="-1">
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="flabel" for="f-native">Native City &amp; State <span class="req">*</span></label>
+            <input type="text" id="f-native" placeholder="e.g. Jaipur, Rajasthan" aria-describedby="e-native">
+            <div class="field-error" id="e-native">This field is required.</div>
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-sex">Sex <span class="req">*</span></label>
+            <select id="f-sex" aria-describedby="e-sex">
+              <option value="">Select…</option>
+              <option>Male</option><option>Female</option><option>Prefer not to say</option>
+            </select>
+            <div class="field-error" id="e-sex">Please select.</div>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="flabel" for="f-religion">Religion</label>
+            <input type="text" id="f-religion" placeholder="e.g. Hindu">
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-languages">Languages Known</label>
+            <input type="text" id="f-languages" placeholder="e.g. English, Hindi, Tamil">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field">
+          <label class="flabel" for="f-present-addr">Present Address <span class="req">*</span></label>
+          <textarea id="f-present-addr" rows="3" placeholder="House / flat no., street, area, city, state, PIN code" aria-describedby="e-present-addr"></textarea>
+          <div class="field-error" id="e-present-addr">Present address is required.</div>
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label class="flabel" for="f-tel-res">Tel (Residence)</label>
+            <input type="tel" id="f-tel-res" placeholder="e.g. 0141 2345678">
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-tel-off">Tel (Office)</label>
+            <input type="tel" id="f-tel-off" placeholder="e.g. 011 23456789">
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-mobile">Mobile <span class="req">*</span></label>
+            <input type="tel" id="f-mobile" placeholder="e.g. 98765 43210" aria-describedby="e-mobile">
+            <div class="field-error" id="e-mobile">Mobile number is required.</div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="inline-check">
+            <input type="checkbox" id="f-same-addr"> Permanent address same as present
+          </label>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-perm-addr">Permanent Address</label>
+          <textarea id="f-perm-addr" rows="3" placeholder="House / flat no., street, area, city, state, PIN code"></textarea>
+        </div>
+        <div class="field" style="max-width:320px;">
+          <label class="flabel" for="f-perm-tel-res">Permanent Tel (Residence)</label>
+          <input type="tel" id="f-perm-tel-res" placeholder="e.g. 0141 2345678">
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Photograph</span>
+        <p class="section-note">Optional. JPEG or PNG, max 2MB.</p>
+        <div class="photo-zone" id="photo-zone" role="button" tabindex="0" aria-label="Upload photo">
+          <div class="pz-icon" aria-hidden="true">📷</div>
+          <div class="pz-main">Drag &amp; drop or click to upload</div>
+          <div class="pz-sub">JPEG or PNG, max 2MB</div>
+        </div>
+        <input type="file" id="photo-input" accept="image/jpeg,image/png" class="sr-only" tabindex="-1">
+        <div class="field-error" id="e-photo" style="margin-top:10px;"></div>
+        <div class="photo-preview" id="photo-preview">
+          <img id="photo-img" alt="Photo preview">
+          <div class="photo-meta">
+            <div class="pname" id="photo-name"></div>
+            <div class="psize" id="photo-size"></div>
+          </div>
+          <button type="button" class="photo-remove" id="photo-remove" aria-label="Remove photo">×</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STEP 2: FAMILY & EDUCATION ===================== -->
+    <section class="step-panel" data-step="2">
+      <h1 class="step-title">Family &amp; Education</h1>
+      <p class="step-intro">Tell us about your family background and qualifications.</p>
+
+      <div class="card">
+        <span class="section-title">Family Members</span>
+        <p class="section-note">Up to 8 members.</p>
+        <div id="dyn-family"></div>
+        <button type="button" class="btn-add" data-add="family">+ Add family member</button>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Educational Qualifications</span>
+        <p class="section-note">List from 10th standard onwards. Up to 10 entries.</p>
+        <div id="dyn-education"></div>
+        <button type="button" class="btn-add" data-add="education">+ Add qualification</button>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Training Courses</span>
+        <p class="section-note">Up to 4.</p>
+        <div id="dyn-trainings"></div>
+        <button type="button" class="btn-add" data-add="trainings">+ Add training</button>
+      </div>
+    </section>
+
+    <!-- ===================== STEP 3: WORK HISTORY ===================== -->
+    <section class="step-panel" data-step="3">
+      <h1 class="step-title">Work History</h1>
+      <p class="step-intro">Your employment record and additional details.</p>
+
+      <div class="card">
+        <span class="section-title">Employment History</span>
+        <p class="section-note">Fill the tabs that apply to you.</p>
+        <div class="emp-tabs" id="emp-tabs">
+          <button type="button" class="emp-tab active" data-emp="present">Present Employment</button>
+          <button type="button" class="emp-tab" data-emp="previous">Previous Employment</button>
+          <button type="button" class="emp-tab" data-emp="prior">Prior to Previous</button>
+        </div>
+        <div id="emp-panels"></div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Extra-Curricular / Sports</span>
+        <p class="section-note">Up to 5.</p>
+        <div id="dyn-extracurricular"></div>
+        <button type="button" class="btn-add" data-add="extracurricular">+ Add activity</button>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Physical Data</span>
+        <p class="section-note">&nbsp;</p>
+        <div class="grid grid-2">
+          <div class="field"><label class="flabel" for="f-height">Height</label><input type="text" id="f-height" placeholder="e.g. 175 cm"></div>
+          <div class="field"><label class="flabel" for="f-weight">Weight</label><input type="text" id="f-weight" placeholder="e.g. 70 kg"></div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field"><label class="flabel" for="f-glasses">Power of Glasses</label><input type="text" id="f-glasses" placeholder="e.g. -1.5 / Nil"></div>
+          <div class="field"><label class="flabel" for="f-disability">Physical Disability (if any)</label><input type="text" id="f-disability" placeholder="Specify if any, else leave blank"></div>
+        </div>
+        <div class="section-divider"></div>
+        <p class="section-note" style="margin-top:0;font-weight:600;color:var(--text);">Most Recent Illness</p>
+        <div class="grid grid-3">
+          <div class="field"><label class="flabel" for="f-illness-from">From</label><input type="date" id="f-illness-from"></div>
+          <div class="field"><label class="flabel" for="f-illness-to">To</label><input type="date" id="f-illness-to"></div>
+          <div class="field"><label class="flabel" for="f-illness-days">No. of Days</label><input type="number" id="f-illness-days" min="0" placeholder="e.g. 5"></div>
+        </div>
+        <div class="field"><label class="flabel" for="f-illness-nature">Nature of Illness</label><input type="text" id="f-illness-nature" placeholder="e.g. Viral fever (leave blank if none)"></div>
+        <div class="section-divider"></div>
+        <label class="flabel">Chronic Illness</label>
+        <div class="pill-group" id="chronic-pills">
+          <button type="button" class="pill" data-chronic="diabetes">Diabetes</button>
+          <button type="button" class="pill" data-chronic="high_bp">High B.P.</button>
+          <button type="button" class="pill" data-chronic="heart_disease">Heart Disease</button>
+          <button type="button" class="pill" data-chronic="asthma">Asthma</button>
+          <button type="button" class="pill" data-chronic="other">Other</button>
+        </div>
+        <div class="reveal" id="chronic-other-wrap" style="margin-top:14px;max-width:360px;">
+          <label class="flabel" for="f-chronic-other">Please specify</label>
+          <input type="text" id="f-chronic-other" placeholder="Please specify the condition">
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Social Media Presence</span>
+        <p class="section-note">Optional.</p>
+        <div class="field">
+          <label class="flabel" for="f-linkedin">LinkedIn</label>
+          <input type="url" id="f-linkedin" placeholder="https://linkedin.com/in/your-profile" aria-label="LinkedIn profile URL">
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-twitter">Twitter / X</label>
+          <input type="url" id="f-twitter" placeholder="https://x.com/your-handle" aria-label="Twitter profile URL">
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-facebook">Facebook</label>
+          <input type="url" id="f-facebook" placeholder="https://facebook.com/your-profile" aria-label="Facebook profile URL">
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STEP 4: CAREER ===================== -->
+    <section class="step-panel" data-step="4">
+      <h1 class="step-title">Career</h1>
+      <p class="step-intro">Take your time — these help us understand you better.</p>
+      <div class="card">
+        <div class="field">
+          <label class="flabel" for="f-noteworthy">Noteworthy Contributions</label>
+          <p class="section-note" style="margin-top:0;">Please describe specific contributions you consider noteworthy during your career so far.</p>
+          <textarea id="f-noteworthy" rows="5" placeholder="Describe specific achievements or contributions you are proud of…"></textarea>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-vision">5-Year Vision</label>
+          <p class="section-note" style="margin-top:0;">What is your career plan and where do you see yourself in the next 5 years?</p>
+          <textarea id="f-vision" rows="5" placeholder="Describe your career plan and where you see yourself in 5 years…"></textarea>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-personal-dev">Personal Development</label>
+          <p class="section-note" style="margin-top:0;">Who are the most important people in your Personal Development?</p>
+          <textarea id="f-personal-dev" rows="4" placeholder="Name the people and explain how they shaped you personally…"></textarea>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-professional-dev">Professional Development</label>
+          <p class="section-note" style="margin-top:0;">Who are the most important people in your Professional Development?</p>
+          <textarea id="f-professional-dev" rows="4" placeholder="Name the people and explain how they shaped you professionally…"></textarea>
+        </div>
+        <div class="field">
+          <label class="flabel" for="f-rolemodel">Role Model</label>
+          <p class="section-note" style="margin-top:0;">Name one person of National or International prominence who you consider your role model, and explain why.</p>
+          <textarea id="f-rolemodel" rows="5" placeholder="Name a person of national / international prominence and explain why…"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STEP 5: GENERAL & REFERENCES ===================== -->
+    <section class="step-panel" data-step="5">
+      <h1 class="step-title">General &amp; References</h1>
+      <p class="step-intro">Final details before you submit.</p>
+      <div class="step-banner" data-banner="5">Please fill in the required fields before continuing.</div>
+
+      <div class="card">
+        <span class="section-title">Interview History</span>
+        <p class="section-note">Have you previously been interviewed at <span id="org-name-inline">this organization</span>?</p>
+        <div class="yn-toggle" data-yn="prev-interview">
+          <button type="button" class="pill" data-val="yes">Yes</button>
+          <button type="button" class="pill" data-val="no">No</button>
+        </div>
+        <div class="reveal" id="prev-interview-reveal">
+          <div class="grid grid-2" style="margin-top:4px;">
+            <div class="field"><label class="flabel" for="f-int-name">Interviewer Name</label><input type="text" id="f-int-name" placeholder="e.g. Mr. Sharma"></div>
+            <div class="field"><label class="flabel" for="f-int-date">Date / Year</label><input type="text" id="f-int-date" placeholder="e.g. March 2022"></div>
+            <div class="field"><label class="flabel" for="f-int-position">Position Applied</label><input type="text" id="f-int-position" placeholder="e.g. Marketing Executive"></div>
+            <div class="field"><label class="flabel" for="f-int-location">Location</label><input type="text" id="f-int-location" placeholder="e.g. Delhi"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Known Persons Here</span>
+        <p class="section-note">Relatives or known persons employed at this organization. Up to 3.</p>
+        <div id="dyn-relatives"></div>
+        <button type="button" class="btn-add" data-add="relatives">+ Add person</button>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Additional Disclosures</span>
+        <p class="section-note">&nbsp;</p>
+        <div class="field">
+          <label class="flabel">Are you engaged in any part-time business or consultancy?</label>
+          <div class="yn-toggle" data-yn="parttime">
+            <button type="button" class="pill" data-val="yes">Yes</button>
+            <button type="button" class="pill" data-val="no">No</button>
+          </div>
+          <div class="reveal" id="parttime-reveal" style="margin-top:12px;">
+            <input type="text" id="f-parttime-details" placeholder="Please provide details" aria-label="Part-time business details">
+          </div>
+        </div>
+        <div class="field">
+          <label class="flabel">Have you been involved in any court proceedings?</label>
+          <div class="yn-toggle" data-yn="court">
+            <button type="button" class="pill" data-val="yes">Yes</button>
+            <button type="button" class="pill" data-val="no">No</button>
+          </div>
+          <div class="reveal" id="court-reveal" style="margin-top:12px;">
+            <input type="text" id="f-court-details" placeholder="Please provide details" aria-label="Court proceedings details">
+          </div>
+        </div>
+        <div class="field">
+          <label class="flabel">Do you have a contract or bond with your present employer?</label>
+          <div class="yn-toggle" data-yn="bond">
+            <button type="button" class="pill" data-val="yes">Yes</button>
+            <button type="button" class="pill" data-val="no">No</button>
+          </div>
+          <div class="reveal" id="bond-reveal" style="margin-top:12px;">
+            <input type="text" id="f-bond-details" placeholder="Please provide details" aria-label="Bond details">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Availability</span>
+        <p class="section-note">When could you join, if selected?</p>
+        <div class="field" style="max-width:360px;">
+          <label class="flabel" for="f-notice">Notice Period</label>
+          <input type="text" id="f-notice" placeholder="e.g. 1 month / 90 days / Immediate">
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Declaration</span>
+        <p class="section-note">&nbsp;</p>
+        <div class="declaration">
+          The above information is true to the best of my knowledge. I have not concealed or
+          misrepresented any facts. In case any information given above is found to be incorrect,
+          or any data required to be furnished is found to have been concealed, I will be liable
+          for termination.
+        </div>
+        <div class="field">
+          <label class="inline-check">
+            <input type="checkbox" id="f-declaration" aria-describedby="e-declaration">
+            I confirm the above declaration is true and accurate <span class="req" style="color:var(--error)">*</span>
+          </label>
+          <div class="field-error" id="e-declaration">You must confirm the declaration.</div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="flabel" for="f-place">Place <span class="req">*</span></label>
+            <input type="text" id="f-place" placeholder="e.g. Jaipur" aria-describedby="e-place">
+            <div class="field-error" id="e-place">Place is required.</div>
+          </div>
+          <div class="field">
+            <label class="flabel" for="f-decl-date">Date</label>
+            <input type="text" id="f-decl-date" class="readonly" readonly tabindex="-1">
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Nav buttons -->
+  <div class="nav-bar">
+    <button type="button" class="btn btn-outline" id="btn-prev" style="display:none;">← Previous</button>
+    <button type="button" class="btn btn-primary" id="btn-next">Next →</button>
+    <button type="button" class="btn btn-submit" id="btn-submit" style="display:none;">Submit Application</button>
+  </div>
+  </form>
+
+  <!-- STATE 4 overlay -->
+  <div class="lock-overlay" id="lock-overlay" role="alertdialog" aria-modal="true">
+    <div class="centered-card">
+      <div class="icon-circle error" aria-hidden="true">⏳</div>
+      <h2>Your session has expired</h2>
+      <p>For security, this form locks after a fixed period. Please contact HR to receive a new link.</p>
+      <a class="contact-link" href="mailto:hr@iilm.edu">Contact HR</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= STATE 5: SUCCESS ========================= -->
+<div id="state-success" data-state="success">
+  <div class="centered-card">
+    <div class="icon-circle success" aria-hidden="true">✓</div>
+    <h2>Application Submitted Successfully</h2>
+    <p id="success-name"></p>
+    <div class="org-badge" id="success-org"></div>
+    <p style="margin-top:18px;">Our HR team will review your application and be in touch.</p>
+  </div>
+</div>
+
+<!-- Submit loading overlay -->
+<div class="submit-overlay" id="submit-overlay">
+  <div class="spinner" role="status" aria-label="Submitting"></div>
+  <p>Submitting your application…</p>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — the ONLY block anyone needs to touch
+   ============================================================ */
+const CONFIG = {
+  SESSION_DURATION_MINS: 120,    // hard lock: form expires this many minutes after opening
+  SESSION_WARNING_MINS:  15,     // show warning banner this many minutes before expiry
+  API_BASE:    'http://localhost:8000',
+  WEBHOOK_URL: 'https://apps.iilm.edu/webhook/bts-application-form',
+  MAX_PHOTO_MB: 2
+};
+
+/* ============================================================
+   GLOBAL STATE
+   ============================================================ */
+const STATE = {
+  token: null,
+  org: null,            // 'BTS' | 'IILM'
+  email: null,
+  position: null,
+  currentStep: 1,
+  totalSteps: 5,
+  photoBase64: null,
+  chronic: { diabetes:false, high_bp:false, heart_disease:false, asthma:false, other:false },
+  yn: { 'prev-interview':null, parttime:null, court:null, bond:null },
+  activeEmpTab: 'present',
+  openedAtMs: null,
+  expiryMs: null,
+  timerInterval: null,
+  warned15: false,
+  warned5: false,
+  expired: false,
+  submitted: false
+};
+
+const ORG_INFO = {
+  BTS:  { name: 'Banyan Tree School', mark: 'BTS' },
+  IILM: { name: 'IILM University',     mark: 'IILM' }
+};
+
+/* ============================================================
+   DYNAMIC ROW DEFINITIONS
+   ============================================================ */
+const DYN = {
+  family: {
+    container:'dyn-family', addLabel:'family member', def:1, max:8,
+    cols:[
+      {key:'name', label:'Name', type:'text', ph:'e.g. Suresh Mehta'},
+      {key:'age', label:'Age', type:'number', ph:'e.g. 58'},
+      {key:'relationship', label:'Relationship', type:'text', ph:'e.g. Father'},
+      {key:'occupation_place', label:'Occupation & Place of Work', type:'text', full:true, ph:'e.g. Teacher at DPS, Jaipur'}
+    ]
+  },
+  education: {
+    container:'dyn-education', addLabel:'qualification', def:2, max:10,
+    cols:[
+      {key:'exam', label:'Examination / Degree', type:'text', ph:'e.g. B.Com / MBA / 12th'},
+      {key:'subjects', label:'Subjects / Specialisation', type:'text', ph:'e.g. Marketing'},
+      {key:'year_passing', label:'Year of Passing', type:'text', ph:'e.g. 2019'},
+      {key:'institution', label:'Institution / University / Board', type:'text', full:true, ph:'e.g. University of Rajasthan'},
+      {key:'division', label:'Division / Class', type:'text', ph:'e.g. First'},
+      {key:'percentage', label:'% or CGPA', type:'text', ph:'e.g. 72% / 8.4 CGPA'}
+    ]
+  },
+  trainings: {
+    container:'dyn-trainings', addLabel:'training', def:1, max:4,
+    cols:[
+      {key:'name', label:'Course Name', type:'text', full:true, ph:'e.g. Digital Marketing Certification'},
+      {key:'institution', label:'Institution', type:'text', ph:'e.g. Google'},
+      {key:'from_year', label:'From', type:'text', ph:'e.g. 2020'},
+      {key:'to_year', label:'To', type:'text', ph:'e.g. 2021'}
+    ]
+  },
+  extracurricular: {
+    container:'dyn-extracurricular', addLabel:'activity', def:1, max:5,
+    cols:[
+      {key:'activity', label:'Activity', type:'text', ph:'e.g. Cricket / Debating'},
+      {key:'institution', label:'Institution / Club', type:'text', ph:'e.g. College team'},
+      {key:'year', label:'Year', type:'text', ph:'e.g. 2018'},
+      {key:'position', label:'Position', type:'text', ph:'e.g. Captain'},
+      {key:'prizes', label:'Prizes Won', type:'text', full:true, ph:'e.g. Inter-college winner'}
+    ]
+  },
+  relatives: {
+    container:'dyn-relatives', addLabel:'person', def:1, max:3,
+    cols:[
+      {key:'name', label:'Name', type:'text', ph:'e.g. Anita Verma'},
+      {key:'relationship', label:'Relationship', type:'text', ph:'e.g. Cousin / Friend'},
+      {key:'position', label:'Position', type:'text', ph:'e.g. Senior Teacher'},
+      {key:'campus', label:'Campus', type:'text', ph:'e.g. Main campus'}
+    ]
+  }
+};
+
+/* ============================================================
+   EMPLOYMENT DEFINITIONS
+   ============================================================ */
+const EMP_TYPES = [
+  { key:'present',  label:'Present Employment',  reason:false },
+  { key:'previous', label:'Previous Employment', reason:true  },
+  { key:'prior',    label:'Prior to Previous',   reason:true  }
+];
+
+/* ============================================================
+   SMALL HELPERS
+   ============================================================ */
+const $  = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const val = (id) => { const el = $(id); return el ? el.value.trim() : ''; };
+
+function showState(name){
+  document.querySelectorAll('[data-state]').forEach(el =>
+    el.classList.toggle('is-active', el.getAttribute('data-state') === name));
+}
+
+/* ============================================================
+   BOOT — validate token
+   ============================================================ */
+(async function boot(){
+  buildDynamicSections();
+  buildEmploymentPanels();
+  wireStaticHandlers();
+  $('f-decl-date').value = todayISO();
+
+  const params = new URLSearchParams(location.search);
+  STATE.token = params.get('token');
+
+  if(!STATE.token){ return showError('not_found'); }
+
+  try{
+    const res = await fetch(`${CONFIG.API_BASE}/validate-token/${encodeURIComponent(STATE.token)}`);
+    const data = await res.json();
+    if(!data || data.valid !== true){
+      return showError(data && data.reason ? data.reason : 'not_found');
+    }
+    STATE.org = data.org;
+    STATE.email = data.email;
+    STATE.position = data.position || '';
+    onTokenValid(data);
+  }catch(e){
+    // Network / server failure — treat as not found so candidate contacts HR
+    showError('not_found', 'We could not validate your link right now. Please check your connection or contact HR.');
+  }
+})();
+
+function todayISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ============================================================
+   ERROR STATE
+   ============================================================ */
+function showError(reason, customMsg){
+  const map = {
+    not_found:          { icon:'🔗', title:'Link not valid', msg:'This link is not valid. Please contact HR.' },
+    expired:            { icon:'⏳', title:'Link expired', msg:'This link has expired. Please contact HR for a new one.' },
+    already_submitted:  { icon:'✓',  title:'Already submitted', msg:'Your application has already been submitted. Thank you.' }
+  };
+  const m = map[reason] || map.not_found;
+  $('err-icon').textContent = m.icon;
+  $('err-title').textContent = m.title;
+  $('err-msg').textContent = customMsg || m.msg;
+  $('err-icon').className = 'icon-circle ' + (reason === 'already_submitted' ? 'success' : 'error');
+  if(STATE.org && ORG_INFO[STATE.org]){
+    applyTheme(STATE.org);
+    const o = $('err-org'); o.style.display='block'; o.textContent = ORG_INFO[STATE.org].name;
+  }
+  showState('error');
+}
+
+/* ============================================================
+   TOKEN VALID — set up form
+   ============================================================ */
+function onTokenValid(data){
+  applyTheme(STATE.org);
+  const info = ORG_INFO[STATE.org] || { name:STATE.org, mark:STATE.org };
+
+  $('logo-mark').textContent = info.mark;
+  $('brand-org').textContent = info.name;
+  $('email-chip-text').textContent = STATE.email;
+  $('email-chip').title = STATE.email;
+  $('org-name-inline').textContent = info.name;
+
+  $('f-org').value = info.name;
+  $('f-email').value = STATE.email;
+  $('f-position').value = STATE.position || '—';
+
+  showState('form');
+
+  // Fire-and-forget open ping
+  fetch(`${CONFIG.API_BASE}/tokens/open/${encodeURIComponent(STATE.token)}`, { method:'POST' }).catch(()=>{});
+
+  setupSession(data.opened_at);
+  goToStep(1);
+}
+
+function applyTheme(org){
+  document.body.className = org === 'IILM' ? 'org-iilm' : 'org-bts';
+}
+
+/* ============================================================
+   SESSION TIMER
+   ============================================================ */
+function setupSession(serverOpenedAt){
+  const key = 'bts_opened_' + STATE.token;
+  const stored = sessionStorage.getItem(key);
+
+  if(stored){
+    STATE.openedAtMs = parseInt(stored, 10);
+  }else if(serverOpenedAt){
+    STATE.openedAtMs = Date.parse(serverOpenedAt);
+    sessionStorage.setItem(key, String(STATE.openedAtMs));
+  }else{
+    STATE.openedAtMs = Date.now();              // first open
+    sessionStorage.setItem(key, String(STATE.openedAtMs));
+  }
+
+  STATE.expiryMs = STATE.openedAtMs + CONFIG.SESSION_DURATION_MINS * 60000;
+
+  if(STATE.expiryMs - Date.now() <= 0){
+    return lockSession();
+  }
+  tickTimer();
+  STATE.timerInterval = setInterval(tickTimer, 1000);
+}
+
+function tickTimer(){
+  const remaining = STATE.expiryMs - Date.now();
+  if(remaining <= 0){ return lockSession(); }
+
+  const totalSec = Math.floor(remaining / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const remMins = remaining / 60000;
+
+  const label = h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
+  $('timer-text').textContent = `SESSION ACTIVE — ${label}`;
+
+  const pill = $('timer-pill');
+  pill.classList.toggle('danger', remMins <= 5);
+  pill.classList.toggle('warn', remMins > 5 && remMins <= CONFIG.SESSION_WARNING_MINS);
+
+  // Warning banner
+  if(remMins <= CONFIG.SESSION_WARNING_MINS){
+    const wb = $('session-warning');
+    wb.textContent = `⚠ Your session expires in ${Math.ceil(remMins)} minute${Math.ceil(remMins)===1?'':'s'}. Please complete and submit.`;
+    wb.classList.add('show');
+  }
+
+  // Screen reader announcements
+  if(!STATE.warned15 && remMins <= CONFIG.SESSION_WARNING_MINS){
+    STATE.warned15 = true;
+    $('timer-live').textContent = `Your session expires in about ${Math.ceil(remMins)} minutes.`;
+  }
+  if(!STATE.warned5 && remMins <= 5){
+    STATE.warned5 = true;
+    $('timer-live').textContent = `Warning: your session expires in about ${Math.ceil(remMins)} minutes. Please submit soon.`;
+  }
+}
+
+function lockSession(){
+  if(STATE.expired) return;
+  STATE.expired = true;
+  clearInterval(STATE.timerInterval);
+  $('timer-text').textContent = 'SESSION EXPIRED';
+  $('timer-pill').classList.add('danger');
+  $('app-form').classList.add('form-locked');
+  $('lock-overlay').classList.add('show');
+}
+
+/* ============================================================
+   STEP NAVIGATION
+   ============================================================ */
+function goToStep(n){
+  STATE.currentStep = n;
+  document.querySelectorAll('.step-panel').forEach(p =>
+    p.classList.toggle('active', +p.getAttribute('data-step') === n));
+
+  // progress dots
+  document.querySelectorAll('.pstep').forEach(s => {
+    const i = +s.getAttribute('data-pstep');
+    s.classList.toggle('active', i === n);
+    s.classList.toggle('done', i < n);
+  });
+  $('progress-fill').style.width = ((n-1)/(STATE.totalSteps-1)*86) + '%';
+
+  const labels = ['Personal','Family & Education','Work History','Career','General & References'];
+  $('mobile-step-label').textContent = `Step ${n} of ${STATE.totalSteps} — ${labels[n-1]}`;
+
+  // buttons
+  $('btn-prev').style.display = n > 1 ? '' : 'none';
+  $('btn-next').style.display = n < STATE.totalSteps ? '' : 'none';
+  $('btn-submit').style.display = n === STATE.totalSteps ? '' : 'none';
+
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+/* ============================================================
+   BUILD DYNAMIC SECTIONS
+   ============================================================ */
+function buildDynamicSections(){
+  Object.keys(DYN).forEach(name => {
+    const cfg = DYN[name];
+    for(let i=0;i<cfg.def;i++) addDynRow(name);
+  });
+}
+
+function addDynRow(name){
+  const cfg = DYN[name];
+  const container = $(cfg.container);
+  if(container.children.length >= cfg.max) return;
+
+  const idx = container.children.length;
+  const row = document.createElement('div');
+  row.className = 'dyn-row';
+  row.setAttribute('data-dyn', name);
+
+  let html = `<div class="dyn-row-num">${cfg.addLabel} ${idx+1}</div>
+    <button type="button" class="dyn-remove" aria-label="Remove">×</button>
+    <div class="grid grid-2">`;
+  cfg.cols.forEach(col => {
+    const full = col.full ? ' style="grid-column:1/-1;"' : '';
+    html += `<div class="field"${full}><label class="flabel">${esc(col.label)}</label>`;
+    if(col.type === 'select'){
+      html += `<select data-key="${col.key}"><option value="">Select…</option>` +
+        col.options.map(o=>`<option>${esc(o)}</option>`).join('') + `</select>`;
+    }else{
+      html += `<input type="${col.type === 'number' ? 'number' : 'text'}" data-key="${col.key}" placeholder="${esc(col.ph || col.label)}">`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+  row.innerHTML = html;
+
+  row.querySelector('.dyn-remove').addEventListener('click', () => {
+    container.removeChild(row);
+    renumber(name);
+  });
+  container.appendChild(row);
+  renumber(name);
+}
+
+function renumber(name){
+  const cfg = DYN[name];
+  const container = $(cfg.container);
+  [...container.children].forEach((row, i) => {
+    row.querySelector('.dyn-row-num').textContent = `${cfg.addLabel} ${i+1}`;
+  });
+  // disable add button at max
+  const btn = document.querySelector(`.btn-add[data-add="${name}"]`);
+  if(btn) btn.disabled = container.children.length >= cfg.max;
+}
+
+function collectDyn(name){
+  const cfg = DYN[name];
+  const container = $(cfg.container);
+  const rows = [];
+  [...container.children].forEach(row => {
+    const obj = {};
+    let hasValue = false;
+    row.querySelectorAll('[data-key]').forEach(el => {
+      const v = el.value.trim();
+      obj[el.getAttribute('data-key')] = v;
+      if(v) hasValue = true;
+    });
+    if(hasValue) rows.push(obj);   // filter empty rows
+  });
+  return rows;
+}
+
+/* ============================================================
+   BUILD EMPLOYMENT PANELS
+   ============================================================ */
+function buildEmploymentPanels(){
+  const wrap = $('emp-panels');
+  EMP_TYPES.forEach(t => {
+    const p = document.createElement('div');
+    p.className = 'emp-panel' + (t.key === 'present' ? ' active' : '');
+    p.setAttribute('data-emp-panel', t.key);
+    p.innerHTML = `
+      <div class="field"><label class="flabel">Employer Name</label>
+        <input type="text" data-emp-key="employer_name" placeholder="e.g. AdWorks Pvt Ltd"></div>
+      <div class="field"><label class="flabel">Employer Address</label>
+        <textarea rows="2" data-emp-key="employer_address" placeholder="City, state"></textarea></div>
+      <div class="field"><label class="flabel">Nature of Business / Turnover</label>
+        <input type="text" data-emp-key="nature_business" placeholder="e.g. Advertising agency"></div>
+      <div class="grid grid-3">
+        <div class="field"><label class="flabel">Period From</label>
+          <input type="date" data-emp-key="period_from" data-emp-dur="${t.key}"></div>
+        <div class="field"><label class="flabel">Period To</label>
+          <input type="date" data-emp-key="period_to" data-emp-dur="${t.key}"></div>
+        <div class="field"><label class="flabel">Duration</label>
+          <input type="text" class="readonly" readonly tabindex="-1" data-emp-key="duration" id="emp-dur-${t.key}" placeholder="Auto-calculated"></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="field"><label class="flabel">Starting Position</label>
+          <input type="text" data-emp-key="position_start" placeholder="e.g. Executive"></div>
+        <div class="field"><label class="flabel">Last / Current Position</label>
+          <input type="text" data-emp-key="position_last" placeholder="e.g. Senior Executive"></div>
+      </div>
+      <div class="field"><label class="flabel">Location</label>
+        <input type="text" data-emp-key="job_location" placeholder="e.g. Gurgaon"></div>
+      <div class="field"><label class="flabel">Supervisor Name &amp; Designation</label>
+        <input type="text" data-emp-key="supervisor" placeholder="e.g. Mr. Khanna, Director"></div>
+      <div class="grid grid-3">
+        <div class="field"><label class="flabel">Basic (₹/PM)</label>
+          <input type="number" min="0" data-emp-key="salary_basic" data-emp-sal="${t.key}" placeholder="e.g. 55000"></div>
+        <div class="field"><label class="flabel">Allowances (₹/PM)</label>
+          <input type="number" min="0" data-emp-key="salary_allowances" data-emp-sal="${t.key}" placeholder="e.g. 10000"></div>
+        <div class="field"><label class="flabel">Total (₹/PM)</label>
+          <input type="text" class="readonly" readonly tabindex="-1" data-emp-key="salary_total" id="emp-sal-${t.key}" placeholder="Auto-calculated"></div>
+      </div>
+      <div class="field"><label class="flabel">Job Description</label>
+        <textarea rows="3" data-emp-key="job_description" placeholder="Briefly describe your role and responsibilities…"></textarea></div>
+      ${t.reason ? `<div class="field"><label class="flabel">Reason for Leaving</label>
+        <input type="text" data-emp-key="reason_leaving" placeholder="e.g. Career growth"></div>` : ''}
+    `;
+    wrap.appendChild(p);
+  });
+
+  // duration + salary auto-calc
+  wrap.querySelectorAll('[data-emp-dur]').forEach(el =>
+    el.addEventListener('change', () => calcDuration(el.getAttribute('data-emp-dur'))));
+  wrap.querySelectorAll('[data-emp-sal]').forEach(el =>
+    el.addEventListener('input', () => calcSalary(el.getAttribute('data-emp-sal'))));
+}
+
+function empPanel(key){ return document.querySelector(`[data-emp-panel="${key}"]`); }
+
+function calcDuration(key){
+  const p = empPanel(key);
+  const from = p.querySelector('[data-emp-key="period_from"]').value;
+  const to = p.querySelector('[data-emp-key="period_to"]').value;
+  const out = $('emp-dur-'+key);
+  if(!from || !to){ out.value=''; return; }
+  const d1 = new Date(from), d2 = new Date(to);
+  if(d2 < d1){ out.value='—'; return; }
+  let months = (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth());
+  if(d2.getDate() < d1.getDate()) months--;
+  if(months < 0) months = 0;
+  const y = Math.floor(months/12), mo = months%12;
+  out.value = `${y} yr ${mo} mo`;
+}
+
+function calcSalary(key){
+  const p = empPanel(key);
+  const b = parseFloat(p.querySelector('[data-emp-key="salary_basic"]').value) || 0;
+  const a = parseFloat(p.querySelector('[data-emp-key="salary_allowances"]').value) || 0;
+  $('emp-sal-'+key).value = (b+a) ? (b+a).toLocaleString('en-IN') : '';
+}
+
+function collectEmployment(){
+  const out = [];
+  EMP_TYPES.forEach(t => {
+    const p = empPanel(t.key);
+    const obj = { type:t.key };
+    let hasValue = false;
+    p.querySelectorAll('[data-emp-key]').forEach(el => {
+      const v = el.value.trim();
+      obj[el.getAttribute('data-emp-key')] = v;
+      if(v && el.getAttribute('data-emp-key') !== 'duration' && el.getAttribute('data-emp-key') !== 'salary_total') hasValue = true;
+    });
+    if(!t.reason) obj.reason_leaving = '';
+    if(hasValue) out.push(obj);
+  });
+  return out;
+}
+
+/* ============================================================
+   STATIC HANDLERS
+   ============================================================ */
+function wireStaticHandlers(){
+  // Nav
+  $('btn-next').addEventListener('click', () => {
+    if(STATE.expired) return;
+    if(validateStep(STATE.currentStep)) goToStep(STATE.currentStep + 1);
+  });
+  $('btn-prev').addEventListener('click', () => {
+    if(STATE.expired) return;
+    goToStep(STATE.currentStep - 1);
+  });
+  $('btn-submit').addEventListener('click', submitForm);
+
+  // Add buttons
+  document.querySelectorAll('.btn-add').forEach(btn =>
+    btn.addEventListener('click', () => { if(!STATE.expired) addDynRow(btn.getAttribute('data-add')); }));
+
+  // DOB -> age
+  $('f-dob').addEventListener('change', () => {
+    const dob = $('f-dob').value;
+    $('f-age').value = dob ? computeAge(dob) : '';
+  });
+
+  // Same address checkbox
+  $('f-same-addr').addEventListener('change', e => {
+    if(e.target.checked){
+      $('f-perm-addr').value = $('f-present-addr').value;
+      $('f-perm-addr').classList.add('locked');
+      $('f-perm-addr').setAttribute('readonly','');
+    }else{
+      $('f-perm-addr').classList.remove('locked');
+      $('f-perm-addr').removeAttribute('readonly');
+    }
+  });
+  $('f-present-addr').addEventListener('input', () => {
+    if($('f-same-addr').checked) $('f-perm-addr').value = $('f-present-addr').value;
+  });
+
+  // Photo
+  setupPhoto();
+
+  // Employment tabs
+  document.querySelectorAll('.emp-tab').forEach(tab =>
+    tab.addEventListener('click', () => {
+      const k = tab.getAttribute('data-emp');
+      STATE.activeEmpTab = k;
+      document.querySelectorAll('.emp-tab').forEach(t => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.emp-panel').forEach(p =>
+        p.classList.toggle('active', p.getAttribute('data-emp-panel') === k));
+    }));
+
+  // Chronic pills
+  document.querySelectorAll('#chronic-pills .pill').forEach(pill =>
+    pill.addEventListener('click', () => {
+      const k = pill.getAttribute('data-chronic');
+      STATE.chronic[k] = !STATE.chronic[k];
+      pill.classList.toggle('selected', STATE.chronic[k]);
+      if(k === 'other') $('chronic-other-wrap').classList.toggle('show', STATE.chronic.other);
+    }));
+
+  // Yes/No toggles
+  document.querySelectorAll('.yn-toggle').forEach(group => {
+    const name = group.getAttribute('data-yn');
+    group.querySelectorAll('.pill').forEach(pill =>
+      pill.addEventListener('click', () => {
+        const v = pill.getAttribute('data-val');
+        STATE.yn[name] = v;
+        group.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === pill));
+        const reveal = $(name + '-reveal');
+        if(reveal) reveal.classList.toggle('show', v === 'yes');
+      }));
+  });
+
+  // clear field error on input
+  document.addEventListener('input', e => {
+    if(e.target.classList && e.target.classList.contains('invalid')){
+      e.target.classList.remove('invalid');
+      const err = e.target.getAttribute('aria-describedby');
+      if(err && $(err)) $(err).classList.remove('show');
+    }
+  });
+}
+
+function computeAge(dob){
+  const b = new Date(dob), n = new Date();
+  let age = n.getFullYear() - b.getFullYear();
+  const mdiff = n.getMonth() - b.getMonth();
+  if(mdiff < 0 || (mdiff === 0 && n.getDate() < b.getDate())) age--;
+  return age >= 0 && age < 120 ? age : '';
+}
+
+/* ============================================================
+   PHOTO UPLOAD
+   ============================================================ */
+function setupPhoto(){
+  const zone = $('photo-zone'), input = $('photo-input');
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); input.click(); }});
+  ['dragenter','dragover'].forEach(ev =>
+    zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(ev =>
+    zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('dragover'); }));
+  zone.addEventListener('drop', e => { if(e.dataTransfer.files.length) handlePhoto(e.dataTransfer.files[0]); });
+  input.addEventListener('change', e => { if(e.target.files.length) handlePhoto(e.target.files[0]); });
+  $('photo-remove').addEventListener('click', removePhoto);
+}
+
+function handlePhoto(file){
+  const err = $('e-photo');
+  err.classList.remove('show'); err.textContent='';
+
+  if(!['image/jpeg','image/png'].includes(file.type)){
+    err.textContent = 'Only JPEG or PNG images are allowed.';
+    err.classList.add('show'); return;
+  }
+  if(file.size > CONFIG.MAX_PHOTO_MB * 1024 * 1024){
+    err.textContent = `File is too large. Maximum size is ${CONFIG.MAX_PHOTO_MB}MB.`;
+    err.classList.add('show'); return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    STATE.photoBase64 = reader.result;            // data URL (base64)
+    $('photo-img').src = reader.result;
+    $('photo-name').textContent = file.name;
+    $('photo-size').textContent = formatSize(file.size);
+    $('photo-preview').classList.add('show');
+    $('photo-zone').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(){
+  STATE.photoBase64 = null;
+  $('photo-input').value = '';
+  $('photo-preview').classList.remove('show');
+  $('photo-zone').style.display = '';
+}
+
+function formatSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+/* ============================================================
+   VALIDATION
+   ============================================================ */
+function markError(id, show){
+  const el = $(id);
+  if(!el) return;
+  el.classList.toggle('invalid', show);
+  const err = el.getAttribute('aria-describedby');
+  if(err && $(err)) $(err).classList.toggle('show', show);
+}
+
+function validateStep(step){
+  if(step === 1) return validateStep1();
+  if(step === 5) return validateStep5();
+  return true;
+}
+
+function validateStep1(){
+  let ok = true;
+  const required = [
+    ['f-salutation', () => !!val('f-salutation')],
+    ['f-first',      () => !!val('f-first')],
+    ['f-surname',    () => !!val('f-surname')],
+    ['f-dob',        () => !!val('f-dob')],
+    ['f-native',     () => !!val('f-native')],
+    ['f-sex',        () => !!val('f-sex')],
+    ['f-mobile',     () => !!val('f-mobile')],
+    ['f-present-addr', () => !!val('f-present-addr')]
+  ];
+  required.forEach(([id, test]) => { const good = test(); markError(id, !good); if(!good) ok = false; });
+
+  // email (locked, but validate format defensively)
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('f-email'));
+  markError('f-email', !emailOk);
+  if(!emailOk) ok = false;
+
+  document.querySelector('[data-banner="1"]').classList.toggle('show', !ok);
+  return ok;
+}
+
+function validateStep5(){
+  let ok = true;
+  const declOk = $('f-declaration').checked;
+  markError('f-declaration', !declOk);
+  if(!declOk) ok = false;
+
+  const placeOk = !!val('f-place');
+  markError('f-place', !placeOk);
+  if(!placeOk) ok = false;
+
+  document.querySelector('[data-banner="5"]').classList.toggle('show', !ok);
+  return ok;
+}
+
+/* ============================================================
+   COLLECT + SUBMIT
+   ============================================================ */
+function collectData(){
+  return {
+    token: STATE.token,
+    org: STATE.org,
+    email: STATE.email,
+    position_applied_for: STATE.position,
+
+    salutation: val('f-salutation'),
+    first_name: val('f-first'),
+    middle_name: val('f-middle'),
+    surname: val('f-surname'),
+    date_of_birth: val('f-dob'),
+    age: parseInt(val('f-age'),10) || null,
+    native_city_state: val('f-native'),
+    sex: val('f-sex'),
+    religion: val('f-religion'),
+    languages_known: val('f-languages'),
+    present_address: val('f-present-addr'),
+    tel_res: val('f-tel-res'),
+    tel_off: val('f-tel-off'),
+    mobile: val('f-mobile'),
+    permanent_address: val('f-perm-addr'),
+    perm_tel_res: val('f-perm-tel-res'),
+    photo_base64: STATE.photoBase64 || null,
+
+    family_members: collectDyn('family'),
+    education: collectDyn('education'),
+    trainings: collectDyn('trainings'),
+
+    employment: collectEmployment(),
+    extracurricular: collectDyn('extracurricular'),
+    height: val('f-height'),
+    weight: val('f-weight'),
+    power_of_glasses: val('f-glasses'),
+    physical_disability: val('f-disability'),
+    illness_from: val('f-illness-from'),
+    illness_to: val('f-illness-to'),
+    illness_days: val('f-illness-days'),
+    illness_nature: val('f-illness-nature'),
+    chronic_diabetes: STATE.chronic.diabetes,
+    chronic_high_bp: STATE.chronic.high_bp,
+    chronic_heart_disease: STATE.chronic.heart_disease,
+    chronic_asthma: STATE.chronic.asthma,
+    chronic_other: STATE.chronic.other ? val('f-chronic-other') : '',
+    linkedin_profile: val('f-linkedin'),
+    twitter_profile: val('f-twitter'),
+    facebook_profile: val('f-facebook'),
+
+    noteworthy_contributions: val('f-noteworthy'),
+    career_plan_5yr: val('f-vision'),
+    important_personal_dev: val('f-personal-dev'),
+    important_professional_dev: val('f-professional-dev'),
+    role_model: val('f-rolemodel'),
+
+    prev_interviewed_org: STATE.yn['prev-interview'] === 'yes',
+    prev_interview_details: {
+      interviewer: val('f-int-name'),
+      date: val('f-int-date'),
+      position: val('f-int-position'),
+      location: val('f-int-location')
+    },
+    org_relatives: collectDyn('relatives'),
+    part_time_business: STATE.yn.parttime === 'yes',
+    part_time_business_details: STATE.yn.parttime === 'yes' ? val('f-parttime-details') : '',
+    court_proceedings: STATE.yn.court === 'yes',
+    court_proceedings_details: STATE.yn.court === 'yes' ? val('f-court-details') : '',
+    employer_bond: STATE.yn.bond === 'yes',
+    employer_bond_details: STATE.yn.bond === 'yes' ? val('f-bond-details') : '',
+    notice_period: val('f-notice'),
+    declaration_agreed: $('f-declaration').checked,
+    declaration_place: val('f-place'),
+    declaration_date: val('f-decl-date')
+  };
+}
+
+async function submitForm(){
+  if(STATE.expired || STATE.submitted) return;
+  if(!validateStep5()) return;
+
+  $('submit-overlay').classList.add('show');
+  // clear any prior submit error banner
+  const errBanner = $('submit-error-banner');
+  if(errBanner) errBanner.remove();
+
+  try{
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(collectData())
+    });
+    let data = {};
+    try{ data = await res.json(); }catch(_){ /* tolerate empty body */ }
+
+    if(res.ok && (data.success === true || data.success === undefined)){
+      STATE.submitted = true;
+      clearInterval(STATE.timerInterval);
+      sessionStorage.removeItem('bts_opened_' + STATE.token);
+      showSuccess();
+    }else{
+      throw new Error('submit failed');
+    }
+  }catch(e){
+    $('submit-overlay').classList.remove('show');
+    showSubmitError();
+  }
+}
+
+function showSubmitError(){
+  if($('submit-error-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'submit-error-banner';
+  banner.className = 'step-banner show';
+  banner.style.margin = '0 0 16px';
+  banner.textContent = 'Submission failed. Please check your connection and try again, or contact HR.';
+  const panel = document.querySelector('.step-panel[data-step="5"]');
+  panel.insertBefore(banner, panel.firstChild);
+  banner.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function showSuccess(){
+  $('submit-overlay').classList.remove('show');
+  const name = [val('f-salutation'), val('f-first'), val('f-surname')].filter(Boolean).join(' ');
+  $('success-name').textContent = name ? `Thank you, ${name}.` : 'Thank you.';
+  $('success-org').textContent = (ORG_INFO[STATE.org] && ORG_INFO[STATE.org].name) || STATE.org || '';
+  showState('success');
+  window.scrollTo({ top:0 });
+}
+</script>
+</body>
+</html>
