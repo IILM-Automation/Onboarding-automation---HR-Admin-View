@@ -638,15 +638,9 @@ input.invalid,select.invalid,textarea.invalid{
             <div class="field-error" id="e-sex">Please select.</div>
           </div>
         </div>
-        <div class="grid grid-2">
-          <div class="field">
-            <label class="flabel" for="f-religion">Religion</label>
-            <input type="text" id="f-religion" placeholder="e.g. Hindu">
-          </div>
-          <div class="field">
-            <label class="flabel" for="f-languages">Languages Known</label>
-            <input type="text" id="f-languages" placeholder="e.g. English, Hindi, Tamil">
-          </div>
+        <div class="field">
+          <label class="flabel" for="f-languages">Languages Known</label>
+          <input type="text" id="f-languages" placeholder="e.g. English, Hindi, Tamil">
         </div>
       </div>
 
@@ -1579,7 +1573,6 @@ function collectData(){
     age: parseInt(val('f-age'),10) || null,
     native_city_state: val('f-native'),
     sex: val('f-sex'),
-    religion: val('f-religion'),
     languages_known: val('f-languages'),
     present_address: val('f-present-addr'),
     tel_res: val('f-tel-res'),
