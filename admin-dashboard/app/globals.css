@@ -443,3 +443,73 @@ table.data tr:last-child td{border-bottom:none;}
   .kv-grid,.two-col,.salary-grid{grid-template-columns:1fr;}
   .dh-name{font-size:20px;}
 }
+
+/* ============================================================
+   PRINT / PDF  — full-record printout (components/PrintView.tsx)
+   ============================================================ */
+
+/* Detail toolbar (screen) */
+.detail-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-bottom:14px;flex-wrap:wrap;
+}
+.btn-print{
+  margin-left:auto;
+  background:var(--accent);color:#fff;border:none;
+  font:inherit;font-weight:600;font-size:13.5px;
+  padding:9px 16px;border-radius:9px;cursor:pointer;
+}
+.btn-print:hover{filter:brightness(0.95);}
+
+/* Print view is hidden on screen; only revealed when printing */
+.print-root{display:none;}
+
+@media print{
+  /* Hide the whole app, reveal only the print view */
+  body * { visibility:hidden; }
+  .print-root, .print-root * { visibility:visible; }
+  .print-root{
+    display:block !important;
+    position:absolute;left:0;top:0;width:100%;
+    color:#000;background:#fff;
+    font-size:11px;line-height:1.4;
+  }
+  @page{ size:A4; margin:14mm; }
+
+  .pv-header{
+    display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+    border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px;
+  }
+  .pv-org{font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:#444;font-weight:700;}
+  .pv-name{font-size:20px;font-weight:800;margin-top:2px;}
+  .pv-meta{font-size:10.5px;color:#333;margin-top:2px;}
+  .pv-photo{width:88px;height:88px;object-fit:cover;border:1px solid #999;border-radius:4px;}
+
+  .pv-section{ margin-bottom:12px; break-inside:avoid; page-break-inside:avoid; }
+  .pv-h2{
+    font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;
+    border-bottom:1px solid #999;padding-bottom:3px;margin:0 0 6px;
+  }
+  .pv-h3{ font-size:11.5px;font-weight:700;margin:8px 0 4px; }
+  .pv-emp{ break-inside:avoid; page-break-inside:avoid; margin-bottom:8px; }
+
+  .pv-grid{ display:grid; grid-template-columns:1fr 1fr; gap:2px 24px; }
+  .pv-row{ display:flex; gap:8px; padding:2px 0; border-bottom:1px dotted #ddd; }
+  .pv-row.full{ grid-column:1 / -1; }
+  .pv-label{ flex:0 0 42%; font-weight:700; color:#333; }
+  .pv-value{ flex:1; white-space:pre-wrap; word-break:break-word; }
+
+  .pv-table{ width:100%; border-collapse:collapse; font-size:10px; }
+  .pv-table th,.pv-table td{ border:1px solid #bbb; padding:3px 5px; text-align:left; vertical-align:top; }
+  .pv-table th{ background:#eee; font-weight:700; }
+
+  .pv-none{ font-style:italic; color:#666; padding:2px 0; }
+  .pv-qa{ margin-bottom:6px; break-inside:avoid; }
+  .pv-q{ font-weight:700; }
+  .pv-a{ white-space:pre-wrap; }
+  .pv-ref{ border:1px solid #ccc; border-radius:4px; padding:6px 8px; margin-bottom:6px; }
+  .pv-decl{ border:1px solid #999; border-radius:4px; padding:8px 10px; font-weight:600; }
+  .pv-footer{ margin-top:16px; padding-top:6px; border-top:1px solid #ccc; font-size:9px; color:#666; text-align:center; }
+
+  a{ color:#000 !important; text-decoration:none; }
+}

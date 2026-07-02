@@ -9,6 +9,7 @@ import { useToast } from "./Toast";
 import OverviewTab from "./tabs/OverviewTab";
 import WorkTab from "./tabs/WorkTab";
 import CareerTab from "./tabs/CareerTab";
+import PrintView from "./PrintView";
 
 type TabKey = "overview" | "work" | "career";
 
@@ -83,9 +84,14 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
         <div className="placeholder">{error || "Failed to load application"}</div>
       ) : (
         <div className="detail-inner">
-          <button className="mobile-back" onClick={onBack}>
-            ← Back to list
-          </button>
+          <div className="detail-toolbar">
+            <button className="mobile-back" onClick={onBack}>
+              ← Back to list
+            </button>
+            <button className="btn-print" onClick={() => window.print()} title="Download / print a full PDF">
+              ⬇ Download PDF
+            </button>
+          </div>
 
           <div className="detail-header">
             <div className="dh-main">
@@ -134,6 +140,9 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
           {tab === "overview" && <OverviewTab app={detail} onSaved={(d) => setDetail(d)} />}
           {tab === "work" && <WorkTab app={detail} />}
           {tab === "career" && <CareerTab app={detail} />}
+
+          {/* Full record for printing / PDF — hidden on screen, shown in @media print */}
+          <PrintView app={detail} />
         </div>
       )}
     </main>

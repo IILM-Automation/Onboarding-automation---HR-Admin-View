@@ -63,6 +63,7 @@ export interface Employment {
   position_last?: string;
   job_location?: string;
   supervisor?: string;
+  ctc?: string;
   salary_basic?: string;
   salary_allowances?: string;
   salary_total?: string;
@@ -87,6 +88,12 @@ export interface PrevInterview {
   date?: string;
   position?: string;
   location?: string;
+}
+export interface OrgRelative {
+  name?: string;
+  relationship?: string;
+  position?: string;
+  campus?: string;
 }
 
 /** Full record returned by GET /applications/{id}. */
@@ -135,6 +142,7 @@ export interface AppDetail extends AppListItem {
 
   prev_interviewed_org?: boolean;
   prev_interview_details?: PrevInterview;
+  org_relatives?: OrgRelative[];
   part_time_business?: boolean;
   part_time_business_details?: string | null;
   court_proceedings?: boolean;

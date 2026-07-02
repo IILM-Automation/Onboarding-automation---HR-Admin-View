@@ -74,9 +74,7 @@ function EmpGrid({ e, showReason }: { e: Employment; showReason: boolean }) {
       <KV label="Last / Current Position" value={e.position_last} />
       <KV label="Location" value={e.job_location} />
       <KV label="Supervisor" value={e.supervisor} />
-      <KV label="Basic (₹/PM)" value={e.salary_basic} />
-      <KV label="Allowances (₹/PM)" value={e.salary_allowances} />
-      <KV label="Total (₹/PM)" value={e.salary_total} />
+      <KV label="CTC (₹/PM)" value={e.ctc ?? e.salary_total ?? e.salary_basic} />
       {showReason && <KV label="Reason for Leaving" value={e.reason_leaving} />}
       <KV label="Job Description" value={e.job_description} full />
     </div>
