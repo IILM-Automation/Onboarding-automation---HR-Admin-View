@@ -13,16 +13,18 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetail, setShowDetail] = useState(false); // mobile slide-in
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(
-    async (s: string, st: string) => {
+    async (s: string, st: string, df: string, dt: string) => {
       setLoading(true);
       try {
-        const data = await fetchApplications({ search: s, status: st });
+        const data = await fetchApplications({ search: s, status: st, dateFrom: df, dateTo: dt });
         setApps(data);
       } catch (e) {
         toast((e as Error).message || "Failed to load applications", "error");
@@ -34,17 +36,22 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     [toast]
   );
 
-  // initial load + reload when status changes
+  // initial load + reload when status / date filters change
   useEffect(() => {
-    load(search, status);
+    load(search, status, dateFrom, dateTo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, dateFrom, dateTo]);
 
   // debounced search
   function onSearchChange(v: string) {
     setSearch(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => load(v, status), 300);
+    searchTimer.current = setTimeout(() => load(v, status, dateFrom, dateTo), 300);
+  }
+
+  function clearDates() {
+    setDateFrom("");
+    setDateTo("");
   }
 
   function selectApp(id: number) {
@@ -69,9 +76,14 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         loading={loading}
         search={search}
         status={status}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
         selectedId={selectedId}
         onSearch={onSearchChange}
         onStatus={setStatus}
+        onDateFrom={setDateFrom}
+        onDateTo={setDateTo}
+        onClearDates={clearDates}
         onSelect={selectApp}
         onLogout={doLogout}
       />

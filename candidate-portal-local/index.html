@@ -536,16 +536,7 @@ input.invalid,select.invalid,textarea.invalid{
         <span id="email-chip-text">—</span>
       </div>
     </div>
-    <div class="timer-row">
-      <span class="timer-pill" id="timer-pill" role="status">
-        <span class="dot" aria-hidden="true"></span>
-        <span id="timer-text">SESSION ACTIVE</span>
-      </span>
-    </div>
   </header>
-
-  <div class="session-warning" id="session-warning" role="alert"></div>
-  <div class="sr-only" aria-live="polite" id="timer-live"></div>
 
   <!-- Progress -->
   <div class="progress-wrap">
@@ -732,10 +723,11 @@ input.invalid,select.invalid,textarea.invalid{
     <section class="step-panel" data-step="3">
       <h1 class="step-title">Work History</h1>
       <p class="step-intro">Your employment record and additional details.</p>
+      <div class="step-banner" data-banner="3">All three employment sections are required. If one does not apply, write “Not Applicable” in its Employer Name.</div>
 
       <div class="card">
         <span class="section-title">Employment History</span>
-        <p class="section-note">Fill the tabs that apply to you.</p>
+        <p class="section-note">All three are required. If a section does not apply, write “Not Applicable” in its Employer Name.</p>
         <div class="emp-tabs" id="emp-tabs">
           <button type="button" class="emp-tab active" data-emp="present">Present Employment</button>
           <button type="button" class="emp-tab" data-emp="previous">Previous Employment</button>
@@ -882,16 +874,6 @@ input.invalid,select.invalid,textarea.invalid{
     <button type="button" class="btn btn-submit" id="btn-submit" style="display:none;">Submit Application</button>
   </div>
   </form>
-
-  <!-- STATE 4 overlay -->
-  <div class="lock-overlay" id="lock-overlay" role="alertdialog" aria-modal="true">
-    <div class="centered-card">
-      <div class="icon-circle error" aria-hidden="true">⏳</div>
-      <h2>Your session has expired</h2>
-      <p>For security, this form locks after a fixed period. Please contact HR to receive a new link.</p>
-      <a class="contact-link" href="mailto:hr@iilm.edu">Contact HR</a>
-    </div>
-  </div>
 </div>
 
 <!-- ========================= STATE 5: SUCCESS ========================= -->
@@ -916,8 +898,8 @@ input.invalid,select.invalid,textarea.invalid{
    CONFIG — the ONLY block anyone needs to touch
    ============================================================ */
 const CONFIG = {
-  SESSION_DURATION_MINS: 120,    // hard lock: form expires this many minutes after opening
-  SESSION_WARNING_MINS:  15,     // show warning banner this many minutes before expiry
+  // Link validity is enforced server-side by the token's expiry (set at invite
+  // time — see note in the token webhook). The candidate sees no timer.
   API_BASE:    'https://apps.iilm.edu/bts-api',
   WEBHOOK_URL: 'https://apps.iilm.edu/webhook/bts-application-form',
   MAX_PHOTO_MB: 2
@@ -936,11 +918,6 @@ const STATE = {
   photoBase64: null,
   yn: { 'prev-interview':null, parttime:null, court:null, bond:null },
   activeEmpTab: 'present',
-  openedAtMs: null,
-  expiryMs: null,
-  timerInterval: null,
-  warned15: false,
-  warned5: false,
   expired: false,
   submitted: false
 };
@@ -1100,85 +1077,15 @@ function onTokenValid(data){
 
   showState('form');
 
-  // Fire-and-forget open ping
+  // Fire-and-forget open ping (records first-open server-side; link
+  // validity is governed by the token's server-side expiry, not the client).
   fetch(`${CONFIG.API_BASE}/tokens/open/${encodeURIComponent(STATE.token)}`, { method:'POST' }).catch(()=>{});
 
-  setupSession(data.opened_at);
   goToStep(1);
 }
 
 function applyTheme(org){
   document.body.className = org === 'IILM' ? 'org-iilm' : 'org-bts';
-}
-
-/* ============================================================
-   SESSION TIMER
-   ============================================================ */
-function setupSession(serverOpenedAt){
-  const key = 'bts_opened_' + STATE.token;
-  const stored = sessionStorage.getItem(key);
-
-  if(stored){
-    STATE.openedAtMs = parseInt(stored, 10);
-  }else if(serverOpenedAt){
-    STATE.openedAtMs = Date.parse(serverOpenedAt);
-    sessionStorage.setItem(key, String(STATE.openedAtMs));
-  }else{
-    STATE.openedAtMs = Date.now();              // first open
-    sessionStorage.setItem(key, String(STATE.openedAtMs));
-  }
-
-  STATE.expiryMs = STATE.openedAtMs + CONFIG.SESSION_DURATION_MINS * 60000;
-
-  if(STATE.expiryMs - Date.now() <= 0){
-    return lockSession();
-  }
-  tickTimer();
-  STATE.timerInterval = setInterval(tickTimer, 1000);
-}
-
-function tickTimer(){
-  const remaining = STATE.expiryMs - Date.now();
-  if(remaining <= 0){ return lockSession(); }
-
-  const totalSec = Math.floor(remaining / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const remMins = remaining / 60000;
-
-  const label = h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
-  $('timer-text').textContent = `SESSION ACTIVE — ${label}`;
-
-  const pill = $('timer-pill');
-  pill.classList.toggle('danger', remMins <= 5);
-  pill.classList.toggle('warn', remMins > 5 && remMins <= CONFIG.SESSION_WARNING_MINS);
-
-  // Warning banner
-  if(remMins <= CONFIG.SESSION_WARNING_MINS){
-    const wb = $('session-warning');
-    wb.textContent = `⚠ Your session expires in ${Math.ceil(remMins)} minute${Math.ceil(remMins)===1?'':'s'}. Please complete and submit.`;
-    wb.classList.add('show');
-  }
-
-  // Screen reader announcements
-  if(!STATE.warned15 && remMins <= CONFIG.SESSION_WARNING_MINS){
-    STATE.warned15 = true;
-    $('timer-live').textContent = `Your session expires in about ${Math.ceil(remMins)} minutes.`;
-  }
-  if(!STATE.warned5 && remMins <= 5){
-    STATE.warned5 = true;
-    $('timer-live').textContent = `Warning: your session expires in about ${Math.ceil(remMins)} minutes. Please submit soon.`;
-  }
-}
-
-function lockSession(){
-  if(STATE.expired) return;
-  STATE.expired = true;
-  clearInterval(STATE.timerInterval);
-  $('timer-text').textContent = 'SESSION EXPIRED';
-  $('timer-pill').classList.add('danger');
-  $('app-form').classList.add('form-locked');
-  $('lock-overlay').classList.add('show');
 }
 
 /* ============================================================
@@ -1514,8 +1421,28 @@ function markError(id, show){
 
 function validateStep(step){
   if(step === 1) return validateStep1();
+  if(step === 3) return validateStep3();
   if(step === 4) return validateStep5();
   return true;
+}
+
+function validateStep3(){
+  // All three employment sections must have an Employer Name (or "Not Applicable").
+  let firstMissing = null;
+  EMP_TYPES.forEach(t => {
+    const input = empPanel(t.key).querySelector('[data-emp-key="employer_name"]');
+    const filled = input.value.trim() !== '';
+    input.classList.toggle('invalid', !filled);
+    if(!filled && !firstMissing) firstMissing = t.key;
+  });
+  const ok = !firstMissing;
+  document.querySelector('[data-banner="3"]').classList.toggle('show', !ok);
+  if(!ok){
+    // switch to the first tab that's missing an employer name
+    const tab = document.querySelector(`.emp-tab[data-emp="${firstMissing}"]`);
+    if(tab) tab.click();
+  }
+  return ok;
 }
 
 function validateStep1(){
@@ -1634,8 +1561,6 @@ async function submitForm(){
 
     if(res.ok && (data.success === true || data.success === undefined)){
       STATE.submitted = true;
-      clearInterval(STATE.timerInterval);
-      sessionStorage.removeItem('bts_opened_' + STATE.token);
       showSuccess();
     }else{
       throw new Error('submit failed');

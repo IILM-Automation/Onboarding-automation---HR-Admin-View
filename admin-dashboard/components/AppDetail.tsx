@@ -9,9 +9,10 @@ import { useToast } from "./Toast";
 import OverviewTab from "./tabs/OverviewTab";
 import WorkTab from "./tabs/WorkTab";
 import CareerTab from "./tabs/CareerTab";
+import NotesTab from "./tabs/NotesTab";
 import PrintView from "./PrintView";
 
-type TabKey = "overview" | "work" | "career";
+type TabKey = "overview" | "work" | "career" | "notes";
 
 interface Props {
   id: number | null;
@@ -135,11 +136,15 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
             <button className={`tab${tab === "career" ? " active" : ""}`} onClick={() => setTab("career")}>
               Career &amp; References
             </button>
+            <button className={`tab${tab === "notes" ? " active" : ""}`} onClick={() => setTab("notes")}>
+              Interviewer Notes
+            </button>
           </div>
 
-          {tab === "overview" && <OverviewTab app={detail} onSaved={(d) => setDetail(d)} />}
+          {tab === "overview" && <OverviewTab app={detail} />}
           {tab === "work" && <WorkTab app={detail} />}
           {tab === "career" && <CareerTab app={detail} />}
+          {tab === "notes" && <NotesTab app={detail} onSaved={(d) => setDetail(d)} />}
 
           {/* Full record for printing / PDF — hidden on screen, shown in @media print */}
           <PrintView app={detail} />

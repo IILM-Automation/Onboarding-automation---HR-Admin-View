@@ -14,6 +14,7 @@
   --st-submitted:#2563EB;
   --st-under_review:#D97706;
   --st-interviewed:#7C3AED;
+  --st-did_not_turn_up:#64748B;
   --st-rejected:#DC2626;
   --st-active_file:#0D9488;
   --st-appointed:#16A34A;
@@ -513,3 +514,46 @@ table.data tr:last-child td{border-bottom:none;}
 
   a{ color:#000 !important; text-decoration:none; }
 }
+
+/* ---- Date-range filter (list panel) ---- */
+.filter-row.date-filter{ display:flex; gap:8px; align-items:flex-end; margin-top:8px; flex-wrap:wrap; }
+.date-field{ display:flex; flex-direction:column; gap:3px; flex:1; min-width:120px; }
+.date-field span{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); font-weight:600; }
+.date-field input{
+  font:inherit; font-size:13px; padding:7px 9px;
+  border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text);
+}
+.date-clear{
+  border:1px solid var(--border); background:var(--surface); color:var(--muted);
+  font:inherit; font-size:12px; font-weight:600; padding:8px 12px; border-radius:8px; cursor:pointer;
+}
+.date-clear:hover{ color:var(--st-rejected); border-color:var(--st-rejected); }
+
+/* Interview line in print header */
+@media print{
+  .pv-interview{ font-weight:600; }
+}
+
+/* ---- Interviewer Notes: tickable options + required marker ---- */
+.salary-field .req{ color:var(--st-rejected); font-weight:700; }
+.tick-group{ display:flex; gap:8px; flex-wrap:wrap; }
+.tick{
+  border:1.5px solid var(--border); background:var(--surface); color:var(--text);
+  font:inherit; font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+.tick:hover{ border-color:var(--accent); }
+.tick.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* ---- Interview rounds ---- */
+.round-head{ display:flex; align-items:center; justify-content:space-between; }
+.round-remove{
+  border:1px solid var(--border); background:var(--surface); color:var(--muted);
+  width:30px; height:30px; border-radius:8px; font-size:14px; line-height:1; cursor:pointer;
+}
+.round-remove:hover{ color:var(--st-rejected); border-color:var(--st-rejected); }
+.btn-add-round{
+  width:100%; border:1.5px dashed var(--accent); color:var(--accent); background:transparent;
+  font:inherit; font-weight:600; font-size:14px; padding:12px; border-radius:10px; cursor:pointer;
+}
+.btn-add-round:hover{ background:rgba(217,119,6,.06); }

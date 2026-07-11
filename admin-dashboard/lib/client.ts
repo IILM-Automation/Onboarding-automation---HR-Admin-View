@@ -3,7 +3,7 @@
  * handlers (same-origin, cookie-authenticated). The backend URL and
  * API key live only on the server — never here.
  */
-import type { AppDetail, AppListItem, Status } from "./types";
+import type { AppDetail, AppListItem, InterviewRound, Status } from "./types";
 
 async function jsonOrThrow(res: Response) {
   let data: any = {};
@@ -61,11 +61,15 @@ export async function fetchApplications(params: {
   search?: string;
   org?: string;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }): Promise<AppListItem[]> {
   const qs = new URLSearchParams();
   if (params.search) qs.set("search", params.search);
   if (params.org && params.org !== "all") qs.set("org", params.org);
   if (params.status && params.status !== "all") qs.set("status", params.status);
+  if (params.dateFrom) qs.set("date_from", params.dateFrom);
+  if (params.dateTo) qs.set("date_to", params.dateTo);
   const res = await fetch("/api/applications" + (qs.toString() ? `?${qs}` : ""), {
     cache: "no-store",
   });
@@ -92,6 +96,7 @@ export interface SalaryPayload {
   expected_salary: string;
   ctc_offered: string;
   salary_notes: string;
+  interview_rounds: InterviewRound[];
 }
 
 export async function updateSalary(

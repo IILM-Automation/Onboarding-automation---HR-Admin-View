@@ -6,6 +6,7 @@ export type Status =
   | "submitted"
   | "under_review"
   | "interviewed"
+  | "did_not_turn_up"
   | "rejected"
   | "active_file"
   | "appointed";
@@ -95,6 +96,16 @@ export interface OrgRelative {
   position?: string;
   campus?: string;
 }
+export interface InterviewRound {
+  round?: number;
+  interviewed_by?: string;
+  interviewed_on?: string;
+  interview_mode?: string;
+  employment_type?: string;
+  designation_offered?: string;
+  date_of_joining?: string;
+  notes?: string;
+}
 
 /** Full record returned by GET /applications/{id}. */
 export interface AppDetail extends AppListItem {
@@ -163,12 +174,22 @@ export interface AppDetail extends AppListItem {
   ctc_offered?: string | null;
   salary_notes?: string | null;
   salary_updated_at?: string | null;
+
+  date_of_interview?: string | null;
+  date_of_joining?: string | null;
+  designation_offered?: string | null;
+  employment_type?: string | null;
+  interviewed_by?: string | null;
+  interview_mode?: string | null;
+  interviewer_notes?: string | null;
+  interview_rounds?: InterviewRound[];
 }
 
 export const STATUS_LABELS: Record<Status, string> = {
   submitted: "Submitted",
   under_review: "Under Review",
   interviewed: "Interviewed",
+  did_not_turn_up: "Did Not Turn Up",
   rejected: "Rejected",
   active_file: "Active File",
   appointed: "Appointed",
@@ -178,6 +199,7 @@ export const STATUS_ORDER: Status[] = [
   "submitted",
   "under_review",
   "interviewed",
+  "did_not_turn_up",
   "rejected",
   "active_file",
   "appointed",

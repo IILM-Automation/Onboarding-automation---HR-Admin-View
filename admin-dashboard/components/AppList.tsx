@@ -9,9 +9,14 @@ interface Props {
   loading: boolean;
   search: string;
   status: string;
+  dateFrom: string;
+  dateTo: string;
   selectedId: number | null;
   onSearch: (v: string) => void;
   onStatus: (v: string) => void;
+  onDateFrom: (v: string) => void;
+  onDateTo: (v: string) => void;
+  onClearDates: () => void;
   onSelect: (id: number) => void;
   onLogout: () => void;
 }
@@ -44,10 +49,26 @@ export default function AppList(p: Props) {
             <option value="submitted">Submitted</option>
             <option value="under_review">Under Review</option>
             <option value="interviewed">Interviewed</option>
+            <option value="did_not_turn_up">Did Not Turn Up</option>
             <option value="rejected">Rejected</option>
             <option value="active_file">Active File</option>
             <option value="appointed">Appointed</option>
           </select>
+        </div>
+        <div className="filter-row date-filter">
+          <label className="date-field">
+            <span>From</span>
+            <input type="date" value={p.dateFrom} max={p.dateTo || undefined} onChange={(e) => p.onDateFrom(e.target.value)} />
+          </label>
+          <label className="date-field">
+            <span>To</span>
+            <input type="date" value={p.dateTo} min={p.dateFrom || undefined} onChange={(e) => p.onDateTo(e.target.value)} />
+          </label>
+          {(p.dateFrom || p.dateTo) && (
+            <button className="date-clear" onClick={p.onClearDates} title="Clear date filter">
+              Clear
+            </button>
+          )}
         </div>
       </div>
 

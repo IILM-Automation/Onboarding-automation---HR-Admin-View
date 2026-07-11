@@ -198,7 +198,7 @@ _LIST_COLUMNS = """
 # Allowed status values — mirror the schema CHECK constraint.
 _STATUSES = {
     "submitted", "under_review", "interviewed",
-    "rejected", "active_file", "appointed",
+    "did_not_turn_up", "rejected", "active_file", "appointed",
 }
 
 
@@ -211,6 +211,8 @@ class SalaryUpdate(BaseModel):
     expected_salary: Optional[str] = None
     ctc_offered: Optional[str] = None
     salary_notes: Optional[str] = None
+    # Multi-round interviewer notes (list of round objects).
+    interview_rounds: Optional[list] = None
 
 
 def _serialize(row: dict) -> dict:
@@ -229,9 +231,15 @@ def list_applications(
     search: Optional[str] = None,
     org: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     x_api_key: Optional[str] = Header(None),
 ):
-    """List applications for the dashboard left panel. Newest first."""
+    """List applications for the dashboard left panel. Newest first.
+
+    date_from / date_to filter on the submission date (created_at), inclusive,
+    as YYYY-MM-DD in the server's local date.
+    """
     require_api_key(x_api_key)
 
     where = []
@@ -254,6 +262,14 @@ def list_applications(
     if status in _STATUSES:
         where.append("status = %s")
         params.append(status)
+
+    if date_from:
+        where.append("created_at::date >= %s")
+        params.append(date_from)
+
+    if date_to:
+        where.append("created_at::date <= %s")
+        params.append(date_to)
 
     clause = ("WHERE " + " AND ".join(where)) if where else ""
 
@@ -334,6 +350,7 @@ def update_salary(
                     expected_salary   = %s,
                     ctc_offered       = %s,
                     salary_notes      = %s,
+                    interview_rounds  = %s::jsonb,
                     salary_updated_at = NOW()
                 WHERE id = %s
                 RETURNING salary_updated_at
@@ -343,6 +360,7 @@ def update_salary(
                     body.expected_salary,
                     body.ctc_offered,
                     body.salary_notes,
+                    json.dumps(body.interview_rounds or []),
                     app_id,
                 ),
             )

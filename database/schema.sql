@@ -138,10 +138,20 @@ ALTER TABLE bts_applications
 ALTER TABLE bts_applications
     ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'submitted'
         CHECK (status IN ('submitted', 'under_review', 'interviewed',
-                          'rejected', 'active_file', 'appointed'));
+                          'did_not_turn_up', 'rejected', 'active_file', 'appointed'));
 
-CREATE INDEX IF NOT EXISTS idx_applications_status ON bts_applications(status);
-CREATE INDEX IF NOT EXISTS idx_applications_org    ON bts_applications(org);
+-- Migration for existing DBs: widen the status CHECK to allow 'did_not_turn_up'.
+-- (ADD COLUMN IF NOT EXISTS above is a no-op once the column exists, so the
+-- constraint must be replaced explicitly.)
+ALTER TABLE bts_applications DROP CONSTRAINT IF EXISTS bts_applications_status_check;
+ALTER TABLE bts_applications
+    ADD CONSTRAINT bts_applications_status_check
+    CHECK (status IN ('submitted', 'under_review', 'interviewed',
+                      'did_not_turn_up', 'rejected', 'active_file', 'appointed'));
+
+CREATE INDEX IF NOT EXISTS idx_applications_status  ON bts_applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_org     ON bts_applications(org);
+CREATE INDEX IF NOT EXISTS idx_applications_created ON bts_applications(created_at);
 
 -- Salary / CTC fields. Intentionally removed from the candidate form;
 -- filled by the HR interviewer during the face-to-face interview.
@@ -151,3 +161,18 @@ ALTER TABLE bts_applications
     ADD COLUMN IF NOT EXISTS ctc_offered       TEXT,
     ADD COLUMN IF NOT EXISTS salary_notes      TEXT,
     ADD COLUMN IF NOT EXISTS salary_updated_at TIMESTAMPTZ;
+
+-- Interview / appointment fields (office use). Set by HR in the admin panel;
+-- these surface on the dedicated "Interviewer Notes" page and printout.
+ALTER TABLE bts_applications
+    ADD COLUMN IF NOT EXISTS date_of_interview   DATE,
+    ADD COLUMN IF NOT EXISTS date_of_joining     DATE,
+    ADD COLUMN IF NOT EXISTS designation_offered TEXT,
+    ADD COLUMN IF NOT EXISTS employment_type     TEXT,
+    ADD COLUMN IF NOT EXISTS interviewed_by      TEXT,
+    ADD COLUMN IF NOT EXISTS interview_mode      TEXT,
+    ADD COLUMN IF NOT EXISTS interviewer_notes   TEXT,
+    -- Multi-round interviewer notes. Each element:
+    -- { round, interviewed_by, interviewed_on, interview_mode, employment_type,
+    --   designation_offered, date_of_joining, notes }
+    ADD COLUMN IF NOT EXISTS interview_rounds    JSONB DEFAULT '[]'::jsonb;

@@ -4,8 +4,8 @@ import { STATUS_LABELS } from "@/lib/types";
 
 /**
  * Full, print-optimised rendering of a candidate application.
- * Renders EVERY section linearly (no tabs) so a printout / PDF misses nothing.
- * Hidden on screen; shown only in @media print (see globals.css .print-root).
+ * Renders EVERY current section linearly (no tabs) so a printout / PDF
+ * misses nothing. Hidden on screen; shown only in @media print.
  */
 
 function Row({ label, value, full }: { label: string; value: React.ReactNode; full?: boolean }) {
@@ -66,26 +66,29 @@ const EMP_SECTIONS: Array<{ key: Employment["type"]; label: string }> = [
 export default function PrintView({ app }: { app: AppDetail }) {
   const family = (app.family_members || []).filter((r) => has(r.name) || has(r.relationship) || has(r.occupation_place) || has(r.age));
   const education = (app.education || []).filter((r) => has(r.exam) || has(r.institution) || has(r.subjects));
-  const memberships = (app.memberships || []).filter((r) => has(r.name) || has(r.type));
   const trainings = (app.trainings || []).filter((r) => has(r.name) || has(r.institution));
   const xc = (app.extracurricular || []).filter((r) => has(r.activity) || has(r.institution));
   const relatives = (app.org_relatives || []).filter((r) => has(r.name) || has(r.relationship) || has(r.position) || has(r.campus));
-  const refs = (app.references_list || []).filter((r) => has(r.name) || has(r.designation_org) || has(r.address_contact));
 
   const emp: Record<string, Employment | undefined> = {};
   (app.employment || []).forEach((e) => { if (e.type) emp[e.type] = e; });
   const anyEmp = EMP_SECTIONS.some(({ key }) => emp[key as string]);
 
-  const chronic: string[] = [];
-  if (app.chronic_diabetes) chronic.push("Diabetes");
-  if (app.chronic_high_bp) chronic.push("High Blood Pressure");
-  if (app.chronic_heart_disease) chronic.push("Heart Disease");
-  if (app.chronic_asthma) chronic.push("Asthma");
-  if (has(app.chronic_other)) chronic.push(app.chronic_other as string);
-
-  const hasHealth =
-    has(app.height) || has(app.weight) || has(app.power_of_glasses) || has(app.physical_disability) ||
-    has(app.illness_from) || has(app.illness_to) || has(app.illness_nature) || chronic.length > 0;
+  // Interview rounds (fall back to a synthesized single round for legacy records).
+  let rounds = app.interview_rounds || [];
+  if (!rounds.length && (has(app.interviewed_by) || has(app.date_of_interview) || has(app.interviewer_notes))) {
+    rounds = [{
+      round: 1,
+      interviewed_by: app.interviewed_by || "",
+      interviewed_on: app.date_of_interview || "",
+      interview_mode: app.interview_mode || "",
+      employment_type: app.employment_type || "",
+      designation_offered: app.designation_offered || "",
+      date_of_joining: app.date_of_joining || "",
+      notes: app.interviewer_notes || "",
+    }];
+  }
+  const lastInterviewDate = rounds.length ? rounds[rounds.length - 1].interviewed_on : app.date_of_interview;
 
   const social: Array<[string, string | null | undefined]> = [
     ["LinkedIn", app.linkedin_profile],
@@ -94,19 +97,6 @@ export default function PrintView({ app }: { app: AppDetail }) {
   ];
   const hasSocial = social.some(([, u]) => has(u));
 
-  const careerQs: Array<[string, string | null | undefined]> = [
-    ["Noteworthy Contributions", app.noteworthy_contributions],
-    ["5-Year Career Plan", app.career_plan_5yr],
-    ["Important People — Personal Development", app.important_personal_dev],
-    ["Important People — Professional Development", app.important_professional_dev],
-    ["Role Model", app.role_model],
-  ];
-  const hasCareer = careerQs.some(([, a]) => has(a));
-
-  const fp = (app.functional_pref || []).filter(has);
-  const lp = (app.locational_pref || []).filter(has);
-  const hasPrefs = fp.length > 0 || lp.length > 0;
-
   const pi = app.prev_interview_details || {};
   const prevInterview = app.prev_interviewed_org
     ? `Yes${[pi.interviewer, pi.position, pi.location, has(pi.date) ? fmtDate(pi.date) : ""].filter(has).length
@@ -114,8 +104,6 @@ export default function PrintView({ app }: { app: AppDetail }) {
         : ""}`
     : "No";
   const yn = (flag: boolean | undefined, d?: string | null) => (flag ? `Yes${has(d) ? ` — ${d}` : ""}` : "No");
-
-  const hasSalary = has(app.current_salary) || has(app.expected_salary) || has(app.ctc_offered) || has(app.salary_notes);
 
   return (
     <div className="print-root" aria-hidden="true">
@@ -134,6 +122,12 @@ export default function PrintView({ app }: { app: AppDetail }) {
             {has(app.mobile) ? ` · ${app.mobile}` : ""}
           </div>
           <div className="pv-meta">Submitted {fmtDate(app.created_at) || "—"} · Application #{app.id}</div>
+          {has(lastInterviewDate) && (
+            <div className="pv-meta pv-interview">
+              Interviewed on: <strong>{fmtDate(lastInterviewDate)}</strong>
+              {rounds.length > 1 ? ` (${rounds.length} rounds)` : ""}
+            </div>
+          )}
         </div>
         {has(app.photo_base64) && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -148,7 +142,6 @@ export default function PrintView({ app }: { app: AppDetail }) {
           <Row label="Date of Birth" value={fmtDate(app.date_of_birth)} />
           <Row label="Age" value={app.age ?? ""} />
           <Row label="Sex" value={app.sex} />
-          <Row label="Religion" value={app.religion} />
           <Row label="Native City & State" value={app.native_city_state} />
           <Row label="Languages Known" value={app.languages_known} />
           <Row label="Mobile" value={app.mobile} />
@@ -178,15 +171,7 @@ export default function PrintView({ app }: { app: AppDetail }) {
         />
       </Section>
 
-      {/* ---- Memberships / Training (only if present) ---- */}
-      {memberships.length > 0 && (
-        <Section title="Professional Memberships">
-          <Table
-            headers={["Institution", "Type", "From", "To"]}
-            rows={memberships.map((r) => [r.name, r.type, r.from_year, r.to_year])}
-          />
-        </Section>
-      )}
+      {/* ---- Training (only if present) ---- */}
       {trainings.length > 0 && (
         <Section title="Training Courses">
           <Table
@@ -237,30 +222,6 @@ export default function PrintView({ app }: { app: AppDetail }) {
         />
       </Section>
 
-      {/* ---- Physical & Health (only if present) ---- */}
-      {hasHealth && (
-        <Section title="Physical & Health">
-          <div className="pv-grid">
-            <Row label="Height" value={app.height} />
-            <Row label="Weight" value={app.weight} />
-            <Row label="Power of Glasses" value={app.power_of_glasses} />
-            <Row label="Physical Disability" value={app.physical_disability} />
-            <Row
-              label="Recent Illness"
-              value={
-                has(app.illness_from) || has(app.illness_to) || has(app.illness_nature)
-                  ? `${fmtDate(app.illness_from) || "—"} → ${fmtDate(app.illness_to) || "—"}${
-                      has(app.illness_days) ? ` (${app.illness_days} days)` : ""
-                    }${has(app.illness_nature) ? ` · ${app.illness_nature}` : ""}`
-                  : ""
-              }
-              full
-            />
-            <Row label="Chronic Conditions" value={chronic.length ? chronic.join(", ") : ""} full />
-          </div>
-        </Section>
-      )}
-
       {/* ---- Social (only if present) ---- */}
       {hasSocial && (
         <Section title="Social Media Presence">
@@ -272,20 +233,6 @@ export default function PrintView({ app }: { app: AppDetail }) {
         </Section>
       )}
 
-      {/* ---- Career (only if present) ---- */}
-      {hasCareer && (
-        <Section title="Career Questions">
-          {careerQs.map(([q, a]) =>
-            has(a) ? (
-              <div className="pv-qa" key={q}>
-                <div className="pv-q">{q}</div>
-                <div className="pv-a">{a}</div>
-              </div>
-            ) : null
-          )}
-        </Section>
-      )}
-
       {/* ---- General ---- */}
       <Section title="General Information">
         <div className="pv-grid">
@@ -294,54 +241,15 @@ export default function PrintView({ app }: { app: AppDetail }) {
           <Row label="Court proceedings" value={yn(app.court_proceedings, app.court_proceedings_details)} full />
           <Row label="Bond with present employer" value={yn(app.employer_bond, app.employer_bond_details)} full />
           <Row label="Notice Period" value={app.notice_period} />
-          <Row label="Earliest Joining" value={fmtDate(app.earliest_joining)} />
         </div>
       </Section>
 
-      {/* ---- Known Persons (org_relatives) — the previously-missing section ---- */}
+      {/* ---- Known Persons ---- */}
       <Section title="Known Persons at Organization">
         <Table
           headers={["Name", "Relationship", "Position", "Campus"]}
           rows={relatives.map((r) => [r.name, r.relationship, r.position, r.campus])}
         />
-      </Section>
-
-      {/* ---- Preferences (only if present) ---- */}
-      {hasPrefs && (
-        <Section title="Preferences">
-          <div className="pv-grid">
-            <Row label="Functional Preferences" value={fp.length ? fp.join(", ") : ""} full />
-            <Row label="Location Preferences" value={lp.length ? lp.join(", ") : ""} full />
-          </div>
-        </Section>
-      )}
-
-      {/* ---- References ---- */}
-      <Section title="References">
-        {refs.length ? (
-          refs.map((r, i) => (
-            <div className="pv-grid pv-ref" key={i}>
-              <Row label="Name" value={r.name} />
-              <Row label="Designation & Organisation" value={r.designation_org} />
-              <Row label="Address & Contact" value={r.address_contact} full />
-              <Row label="When to refer" value={r.when_refer} />
-            </div>
-          ))
-        ) : (
-          <div className="pv-none">None provided</div>
-        )}
-      </Section>
-
-      {/* ---- Compensation (admin, filled during interview) ---- */}
-      <Section title="Compensation (Office Use — Filled During Interview)">
-        <div className="pv-grid">
-          <Row label="Current Salary (₹)" value={app.current_salary} />
-          <Row label="Expected Salary (₹)" value={app.expected_salary} />
-          <Row label="CTC Offered (₹)" value={app.ctc_offered} />
-          <Row label="Notes" value={app.salary_notes} full />
-          {has(app.salary_updated_at) && <Row label="Last Updated" value={fmtDateTime(app.salary_updated_at)} full />}
-        </div>
-        {!hasSalary && <div className="pv-none">To be filled during interview.</div>}
       </Section>
 
       {/* ---- Declaration ---- */}
@@ -353,8 +261,37 @@ export default function PrintView({ app }: { app: AppDetail }) {
         </div>
       </Section>
 
+      {/* ---- Interviewer Notes (office use, last page) ---- */}
+      <Section title="Interviewer Notes (Office Use)">
+        {rounds.length ? (
+          rounds.map((r, i) => (
+            <div className="pv-emp" key={i}>
+              <h3 className="pv-h3">Round {r.round ?? i + 1}</h3>
+              <div className="pv-grid">
+                <Row label="Interviewed by" value={r.interviewed_by} />
+                <Row label="Interviewed on" value={fmtDate(r.interviewed_on)} />
+                <Row label="Interview mode" value={r.interview_mode} />
+                <Row label="Employment type" value={r.employment_type} />
+                <Row label="Designation offered" value={r.designation_offered} />
+                <Row label="Date of joining" value={fmtDate(r.date_of_joining)} />
+                <Row label="Notes" value={r.notes} full />
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="pv-none">No interview recorded yet.</div>
+        )}
+        <h3 className="pv-h3">Salary</h3>
+        <div className="pv-grid">
+          <Row label="Current CTC (₹)" value={app.current_salary} />
+          <Row label="Expected CTC (₹)" value={app.expected_salary} />
+          <Row label="Salary notes" value={app.salary_notes} full />
+          {has(app.salary_updated_at) && <Row label="Last updated" value={fmtDateTime(app.salary_updated_at)} full />}
+        </div>
+      </Section>
+
       <footer className="pv-footer">
-        Generated from BTS/IILM HR Admin · {fmtDateTime(new Date().toISOString())}
+        Generated from BTS/IILM HR Admin
       </footer>
     </div>
   );
