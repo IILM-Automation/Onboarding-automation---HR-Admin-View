@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { config, assertBackendConfigured, type Role } from "./config";
-import { getSessionRole } from "./auth";
+import { getSession } from "./auth";
 
 type ProxyOpts = {
   method?: string;
@@ -19,8 +19,8 @@ type ProxyOpts = {
  */
 export async function proxy(path: string, opts: ProxyOpts = {}): Promise<NextResponse> {
   const allowed = opts.roles ?? ["admin"];
-  const role = await getSessionRole();
-  if (!role || !allowed.includes(role)) {
+  const session = await getSession();
+  if (!session || !allowed.includes(session.role)) {
     return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
   }
 
@@ -35,6 +35,9 @@ export async function proxy(path: string, opts: ProxyOpts = {}): Promise<NextRes
       method: opts.method || "GET",
       headers: {
         "X-API-Key": config.apiKey,
+        // Trusted campus scope derived from the signed session cookie.
+        // The browser never talks to the backend directly, so it cannot forge this.
+        "X-Campus": session.campus,
         ...(opts.body ? { "Content-Type": "application/json" } : {}),
       },
       body: opts.body ? JSON.stringify(opts.body) : undefined,

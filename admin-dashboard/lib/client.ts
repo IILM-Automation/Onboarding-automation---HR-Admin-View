@@ -19,22 +19,30 @@ async function jsonOrThrow(res: Response) {
 }
 
 export type Role = "admin" | "hr";
+/** "all" for super-admin, else a campus name (Delhi/Jaipur/Chandigarh). */
+export type CampusScope = string;
+export type Scope = "admin" | string;
 
-export async function checkSession(): Promise<Role | null> {
+export interface Session {
+  role: Role;
+  campus: CampusScope;
+}
+
+export async function checkSession(): Promise<Session | null> {
   try {
     const res = await fetch("/api/session", { cache: "no-store" });
     const data = await res.json();
-    return data.authed ? (data.role as Role) : null;
+    return data.authed ? { role: data.role as Role, campus: data.campus as string } : null;
   } catch {
     return null;
   }
 }
 
-export async function login(role: Role, password: string): Promise<boolean> {
+export async function login(scope: Scope, password: string): Promise<boolean> {
   const res = await fetch("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, password }),
+    body: JSON.stringify({ scope, password }),
   });
   return res.ok;
 }
@@ -42,13 +50,15 @@ export async function login(role: Role, password: string): Promise<boolean> {
 export interface InviteResult {
   success: boolean;
   email: string;
+  campus?: string;
 }
 
-export async function sendInvite(email: string): Promise<InviteResult> {
+/** campus is required only for super-admin; campus users are scoped server-side. */
+export async function sendInvite(email: string, campus?: string): Promise<InviteResult> {
   const res = await fetch("/api/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, ...(campus ? { campus } : {}) }),
   });
   return jsonOrThrow(res);
 }
@@ -61,6 +71,7 @@ export async function fetchApplications(params: {
   search?: string;
   org?: string;
   status?: string;
+  campus?: string;
   dateFrom?: string;
   dateTo?: string;
 }): Promise<AppListItem[]> {
@@ -68,6 +79,7 @@ export async function fetchApplications(params: {
   if (params.search) qs.set("search", params.search);
   if (params.org && params.org !== "all") qs.set("org", params.org);
   if (params.status && params.status !== "all") qs.set("status", params.status);
+  if (params.campus && params.campus !== "all") qs.set("campus", params.campus);
   if (params.dateFrom) qs.set("date_from", params.dateFrom);
   if (params.dateTo) qs.set("date_to", params.dateTo);
   const res = await fetch("/api/applications" + (qs.toString() ? `?${qs}` : ""), {

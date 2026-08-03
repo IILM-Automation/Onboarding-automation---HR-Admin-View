@@ -5,5 +5,5 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const qs = req.nextUrl.searchParams.toString();
-  return proxy("/applications" + (qs ? `?${qs}` : ""));
+  return proxy("/applications" + (qs ? `?${qs}` : ""), { roles: ["admin", "hr"] });
 }

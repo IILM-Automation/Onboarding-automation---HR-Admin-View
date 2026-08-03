@@ -4,20 +4,27 @@ import type { AppListItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/types";
 import { fullName, relativeDate, statusVar, has } from "@/lib/format";
 
+const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
+
 interface Props {
   apps: AppListItem[];
   loading: boolean;
   search: string;
   status: string;
+  campus: string;
+  isAdmin: boolean;
+  sessionCampus: string;
   dateFrom: string;
   dateTo: string;
   selectedId: number | null;
   onSearch: (v: string) => void;
   onStatus: (v: string) => void;
+  onCampus: (v: string) => void;
   onDateFrom: (v: string) => void;
   onDateTo: (v: string) => void;
   onClearDates: () => void;
   onSelect: (id: number) => void;
+  onInvite: () => void;
   onLogout: () => void;
 }
 
@@ -28,10 +35,14 @@ export default function AppList(p: Props) {
         <div className="list-title-row">
           <span className="list-title">Applications</span>
           <span className="count-badge">{p.apps.length}</span>
+          <span className="scope-chip">{p.isAdmin ? "All campuses" : p.sessionCampus}</span>
           <button className="logout-btn" onClick={p.onLogout}>
             Sign out
           </button>
         </div>
+        <button className="invite-btn" onClick={p.onInvite}>
+          ＋ Invite candidate
+        </button>
         <input
           className="search-input"
           type="text"
@@ -54,6 +65,14 @@ export default function AppList(p: Props) {
             <option value="active_file">Active File</option>
             <option value="appointed">Appointed</option>
           </select>
+          {p.isAdmin && (
+            <select className="status-select" value={p.campus} onChange={(e) => p.onCampus(e.target.value)}>
+              <option value="all">All Campuses</option>
+              {CAMPUSES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="filter-row date-filter">
           <label className="date-field">
@@ -95,6 +114,7 @@ export default function AppList(p: Props) {
                 <span className="card-pos">{has(a.position_applied_for) ? a.position_applied_for : "—"}</span>
                 <span className="card-badges">
                   {a.org && <span className={`org-badge ${a.org}`}>{a.org}</span>}
+                  {has(a.campus) && <span className="campus-badge">{a.campus}</span>}
                   <span className="status-badge" style={{ background: statusVar(a.status) }}>
                     {a.status ? STATUS_LABELS[a.status] : "—"}
                   </span>

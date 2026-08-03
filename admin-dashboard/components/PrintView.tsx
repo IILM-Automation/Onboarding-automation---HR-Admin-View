@@ -110,7 +110,7 @@ export default function PrintView({ app }: { app: AppDetail }) {
       {/* ---- Header ---- */}
       <header className="pv-header">
         <div>
-          <div className="pv-org">{app.org || "—"} · Employment Application</div>
+          <div className="pv-org">{app.org || "—"}{has(app.campus) ? ` · ${app.campus}` : ""} · Employment Application</div>
           <div className="pv-name">{fullName(app)}</div>
           <div className="pv-meta">
             {has(app.position_applied_for) ? app.position_applied_for : "Position not specified"}

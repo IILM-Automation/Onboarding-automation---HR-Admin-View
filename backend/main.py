@@ -189,7 +189,7 @@ def open_token(token: str):
 
 # Columns returned in the list view — kept lean (no JSONB blobs, no photo).
 _LIST_COLUMNS = """
-    id, email, position_applied_for, org, status,
+    id, email, position_applied_for, org, status, campus,
     salutation, first_name, middle_name, surname,
     (photo_base64 IS NOT NULL AND photo_base64 <> '') AS has_photo,
     created_at
@@ -200,6 +200,18 @@ _STATUSES = {
     "submitted", "under_review", "interviewed",
     "did_not_turn_up", "rejected", "active_file", "appointed",
 }
+
+# Campuses — mirror the schema CHECK constraint.
+_CAMPUSES = {"Delhi", "Jaipur", "Chandigarh"}
+
+
+def _campus_scope(x_campus: Optional[str]) -> Optional[str]:
+    """Resolve the trusted X-Campus header into a scope.
+
+    Returns None for super-admin ("all" / missing / unknown) meaning no
+    restriction, or a specific campus that every query must be limited to.
+    """
+    return x_campus if x_campus in _CAMPUSES else None
 
 
 class StatusUpdate(BaseModel):
@@ -231,9 +243,11 @@ def list_applications(
     search: Optional[str] = None,
     org: Optional[str] = None,
     status: Optional[str] = None,
+    campus: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
 ):
     """List applications for the dashboard left panel. Newest first.
 
@@ -263,6 +277,14 @@ def list_applications(
         where.append("status = %s")
         params.append(status)
 
+    # Campus isolation: a campus-scoped session is locked to its campus;
+    # super-admin (scope None) may optionally filter by the ?campus= param.
+    scope = _campus_scope(x_campus)
+    effective_campus = scope or (campus if campus in _CAMPUSES else None)
+    if effective_campus:
+        where.append("campus = %s")
+        params.append(effective_campus)
+
     if date_from:
         where.append("created_at::date >= %s")
         params.append(date_from)
@@ -288,14 +310,29 @@ def list_applications(
 
 
 @app.get("/applications/{app_id}")
-def get_application(app_id: int, x_api_key: Optional[str] = Header(None)):
-    """Full detail for one application, including JSONB sections + photo."""
+def get_application(
+    app_id: int,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+):
+    """Full detail for one application, including JSONB sections + photo.
+
+    Campus isolation: a campus-scoped caller can only read rows for its
+    own campus; anything else returns 404 (indistinguishable from missing).
+    """
     require_api_key(x_api_key)
+    scope = _campus_scope(x_campus)
+
+    sql = "SELECT * FROM bts_applications WHERE id = %s"
+    params: list = [app_id]
+    if scope:
+        sql += " AND campus = %s"
+        params.append(scope)
 
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT * FROM bts_applications WHERE id = %s", (app_id,))
+            cur.execute(sql, params)
             row = cur.fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="application not found")
@@ -309,20 +346,25 @@ def update_status(
     app_id: int,
     body: StatusUpdate,
     x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
 ):
-    """Update an application's lifecycle status."""
+    """Update an application's lifecycle status (campus-scoped)."""
     require_api_key(x_api_key)
+    scope = _campus_scope(x_campus)
 
     if body.status not in _STATUSES:
         raise HTTPException(status_code=400, detail="invalid status")
 
+    sql = "UPDATE bts_applications SET status = %s WHERE id = %s"
+    params: list = [body.status, app_id]
+    if scope:
+        sql += " AND campus = %s"
+        params.append(scope)
+
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE bts_applications SET status = %s WHERE id = %s",
-                (body.status, app_id),
-            )
+            cur.execute(sql, params)
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="application not found")
             conn.commit()
@@ -336,34 +378,39 @@ def update_salary(
     app_id: int,
     body: SalaryUpdate,
     x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
 ):
-    """Fill / update salary + CTC fields during the interview."""
+    """Fill / update salary + interviewer-notes fields (campus-scoped)."""
     require_api_key(x_api_key)
+    scope = _campus_scope(x_campus)
+
+    sql = """
+        UPDATE bts_applications
+        SET current_salary    = %s,
+            expected_salary   = %s,
+            ctc_offered       = %s,
+            salary_notes      = %s,
+            interview_rounds  = %s::jsonb,
+            salary_updated_at = NOW()
+        WHERE id = %s
+    """
+    params: list = [
+        body.current_salary,
+        body.expected_salary,
+        body.ctc_offered,
+        body.salary_notes,
+        json.dumps(body.interview_rounds or []),
+        app_id,
+    ]
+    if scope:
+        sql += " AND campus = %s"
+        params.append(scope)
+    sql += " RETURNING salary_updated_at"
 
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                UPDATE bts_applications
-                SET current_salary    = %s,
-                    expected_salary   = %s,
-                    ctc_offered       = %s,
-                    salary_notes      = %s,
-                    interview_rounds  = %s::jsonb,
-                    salary_updated_at = NOW()
-                WHERE id = %s
-                RETURNING salary_updated_at
-                """,
-                (
-                    body.current_salary,
-                    body.expected_salary,
-                    body.ctc_offered,
-                    body.salary_notes,
-                    json.dumps(body.interview_rounds or []),
-                    app_id,
-                ),
-            )
+            cur.execute(sql, params)
             row = cur.fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail="application not found")
@@ -383,6 +430,7 @@ def update_salary(
 class InviteCreate(BaseModel):
     email: str
     position: Optional[str] = None
+    campus: Optional[str] = None
 
 
 def _fire_invite_webhook(payload: dict) -> bool:
@@ -406,7 +454,11 @@ def _fire_invite_webhook(payload: dict) -> bool:
 
 
 @app.post("/invites")
-def create_invite(body: InviteCreate, x_api_key: Optional[str] = Header(None)):
+def create_invite(
+    body: InviteCreate,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+):
     """
     HR adds an arrived candidate's email. We forward it to the n8n invite
     workflow, which creates the token + emails the candidate the link.
@@ -425,6 +477,13 @@ def create_invite(body: InviteCreate, x_api_key: Optional[str] = Header(None)):
     if not EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address.")
 
+    # Campus: a campus-scoped session forces its own campus; super-admin
+    # must pick one in the request body. Either way it must be a real campus.
+    scope = _campus_scope(x_campus)
+    campus = scope or (body.campus or "").strip()
+    if campus not in _CAMPUSES:
+        raise HTTPException(status_code=400, detail="A valid campus is required for the invite.")
+
     if not N8N_INVITE_WEBHOOK_URL:
         raise HTTPException(
             status_code=500,
@@ -432,7 +491,9 @@ def create_invite(body: InviteCreate, x_api_key: Optional[str] = Header(None)):
         )
 
     try:
-        triggered = _fire_invite_webhook({"email": email, "org": "BTS", "position": position})
+        triggered = _fire_invite_webhook(
+            {"email": email, "org": "BTS", "position": position, "campus": campus}
+        )
     except Exception as exc:  # noqa: BLE001 — surface a clean message to HR
         raise HTTPException(
             status_code=502,
@@ -442,4 +503,4 @@ def create_invite(body: InviteCreate, x_api_key: Optional[str] = Header(None)):
     if not triggered:
         raise HTTPException(status_code=502, detail="The invite workflow rejected the request.")
 
-    return {"success": True, "email": email}
+    return {"success": True, "email": email, "campus": campus}

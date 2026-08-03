@@ -6,5 +6,5 @@ export const runtime = "nodejs";
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
-  return proxy(`/applications/${encodeURIComponent(id)}/status`, { method: "PATCH", body });
+  return proxy(`/applications/${encodeURIComponent(id)}/status`, { method: "PATCH", body, roles: ["admin", "hr"] });
 }

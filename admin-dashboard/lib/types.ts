@@ -17,6 +17,7 @@ export interface AppListItem {
   email?: string | null;
   position_applied_for?: string | null;
   org?: Org | null;
+  campus?: string | null;
   status?: Status | null;
   salutation?: string | null;
   first_name?: string | null;

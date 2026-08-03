@@ -176,3 +176,23 @@ ALTER TABLE bts_applications
     -- { round, interviewed_by, interviewed_on, interview_mode, employment_type,
     --   designation_offered, date_of_joining, notes }
     ADD COLUMN IF NOT EXISTS interview_rounds    JSONB DEFAULT '[]'::jsonb;
+
+-- ============================================================
+-- PART 5: CAMPUS ISOLATION (BTS branches)
+-- Each candidate + token is tagged with a campus; the admin backend
+-- filters every query by the logged-in user's campus (super-admin = all).
+-- ============================================================
+ALTER TABLE bts_applications
+    ADD COLUMN IF NOT EXISTS campus TEXT CHECK (campus IN ('Delhi', 'Jaipur', 'Chandigarh'));
+ALTER TABLE bts_form_tokens
+    ADD COLUMN IF NOT EXISTS campus TEXT CHECK (campus IN ('Delhi', 'Jaipur', 'Chandigarh'));
+
+CREATE INDEX IF NOT EXISTS idx_applications_campus ON bts_applications(campus);
+CREATE INDEX IF NOT EXISTS idx_tokens_campus       ON bts_form_tokens(campus);
+
+-- The "one active invite per person" guard must be campus-aware, so the same
+-- email can hold active invites at different campuses without colliding.
+DROP INDEX IF EXISTS idx_tokens_active_email_org;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_active_email_org_campus
+    ON bts_form_tokens (email, org, campus)
+    WHERE status NOT IN ('submitted', 'expired');

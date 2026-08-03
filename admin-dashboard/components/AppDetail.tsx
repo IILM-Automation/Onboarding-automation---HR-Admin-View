@@ -100,6 +100,7 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
               <div className="dh-sub">
                 <span>{has(detail.position_applied_for) ? detail.position_applied_for : "—"}</span>
                 {detail.org && <span className={`org-badge ${detail.org}`}>{detail.org}</span>}
+                {has(detail.campus) && <span className="campus-badge">{detail.campus}</span>}
               </div>
               <div className="dh-statusrow">
                 <span className="status-badge" style={{ background: statusVar(detail.status) }}>
