@@ -218,6 +218,10 @@ class StatusUpdate(BaseModel):
     status: str
 
 
+class CampusUpdate(BaseModel):
+    campus: str
+
+
 class SalaryUpdate(BaseModel):
     current_salary: Optional[str] = None
     expected_salary: Optional[str] = None
@@ -369,6 +373,40 @@ def update_status(
                 raise HTTPException(status_code=404, detail="application not found")
             conn.commit()
         return {"success": True, "status": body.status}
+    finally:
+        conn.close()
+
+
+@app.patch("/applications/{app_id}/campus")
+def update_campus(
+    app_id: int,
+    body: CampusUpdate,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+):
+    """Reassign an application's campus. SUPER-ADMIN ONLY.
+
+    A campus-scoped caller (X-Campus is a specific campus) is forbidden —
+    only the super-admin (scope 'all' -> None) may move applicants between
+    campuses.
+    """
+    require_api_key(x_api_key)
+    if _campus_scope(x_campus) is not None:
+        raise HTTPException(status_code=403, detail="Only a super-admin can change campus.")
+    if body.campus not in _CAMPUSES:
+        raise HTTPException(status_code=400, detail="invalid campus")
+
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE bts_applications SET campus = %s WHERE id = %s",
+                (body.campus, app_id),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="application not found")
+            conn.commit()
+        return {"success": True, "campus": body.campus}
     finally:
         conn.close()
 

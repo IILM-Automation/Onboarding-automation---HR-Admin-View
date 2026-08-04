@@ -74,6 +74,15 @@ export default function Dashboard({ session, onLogout }: { session: Session; onL
     setApps((prev) => prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)));
   }
 
+  function patchLocalCampus(id: number, newCampus: string) {
+    setApps((prev) =>
+      // If a specific campus filter is active and the row no longer matches, drop it from view.
+      prev
+        .map((a) => (a.id === id ? { ...a, campus: newCampus } : a))
+        .filter((a) => campus === "all" || a.campus === campus)
+    );
+  }
+
   async function doLogout() {
     await logout();
     onLogout();
@@ -102,7 +111,13 @@ export default function Dashboard({ session, onLogout }: { session: Session; onL
         onInvite={() => setInviteOpen(true)}
         onLogout={doLogout}
       />
-      <AppDetail id={selectedId} onBack={() => setShowDetail(false)} onStatusChange={patchLocalStatus} />
+      <AppDetail
+        id={selectedId}
+        isAdmin={isAdmin}
+        onBack={() => setShowDetail(false)}
+        onStatusChange={patchLocalStatus}
+        onCampusChange={patchLocalCampus}
+      />
 
       {inviteOpen && (
         <InviteModal

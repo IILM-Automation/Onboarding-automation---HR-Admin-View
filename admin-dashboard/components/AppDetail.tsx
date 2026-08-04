@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApplication, updateStatus } from "@/lib/client";
+import { fetchApplication, updateStatus, updateCampus } from "@/lib/client";
 import type { AppDetail as Detail, Status } from "@/lib/types";
 import { STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
+
+const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
 import { fmtDate, fullName, has, statusVar } from "@/lib/format";
 import { useToast } from "./Toast";
 import OverviewTab from "./tabs/OverviewTab";
@@ -16,11 +18,13 @@ type TabKey = "overview" | "work" | "career" | "notes";
 
 interface Props {
   id: number | null;
+  isAdmin: boolean;
   onBack: () => void;
   onStatusChange: (id: number, status: Status) => void;
+  onCampusChange: (id: number, campus: string) => void;
 }
 
-export default function AppDetail({ id, onBack, onStatusChange }: Props) {
+export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampusChange }: Props) {
   const toast = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,6 +71,18 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
     }
   }
 
+  async function onCampusSelect(campus: string) {
+    if (!detail || !campus || campus === detail.campus) return;
+    try {
+      await updateCampus(detail.id, campus);
+      setDetail({ ...detail, campus });
+      onCampusChange(detail.id, campus);
+      toast(`Campus changed to ${campus}`, "success");
+    } catch (e) {
+      toast((e as Error).message || "Failed to change campus", "error");
+    }
+  }
+
   return (
     <main className="detail-panel">
       {id === null ? (
@@ -100,7 +116,25 @@ export default function AppDetail({ id, onBack, onStatusChange }: Props) {
               <div className="dh-sub">
                 <span>{has(detail.position_applied_for) ? detail.position_applied_for : "—"}</span>
                 {detail.org && <span className={`org-badge ${detail.org}`}>{detail.org}</span>}
-                {has(detail.campus) && <span className="campus-badge">{detail.campus}</span>}
+                {isAdmin ? (
+                  <select
+                    className="campus-select"
+                    value={has(detail.campus) ? (detail.campus as string) : ""}
+                    onChange={(e) => onCampusSelect(e.target.value)}
+                    title="Reassign campus (super-admin)"
+                  >
+                    <option value="" disabled>
+                      Set campus…
+                    </option>
+                    {CAMPUSES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  has(detail.campus) && <span className="campus-badge">{detail.campus}</span>
+                )}
               </div>
               <div className="dh-statusrow">
                 <span className="status-badge" style={{ background: statusVar(detail.status) }}>

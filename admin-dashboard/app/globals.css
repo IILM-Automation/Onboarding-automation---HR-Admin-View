@@ -600,3 +600,10 @@ table.data tr:last-child td{border-bottom:none;}
 
 /* campus in print header */
 @media print{ .pv-org{ } }
+
+/* Super-admin campus reassign dropdown (detail header) */
+.campus-select{
+  font:inherit; font-size:12px; font-weight:700; letter-spacing:.3px;
+  padding:2px 8px; border-radius:20px; cursor:pointer;
+  background:#EEF2FF; color:#3730A3; border:1px solid #C7D2FE;
+}

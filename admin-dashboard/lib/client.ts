@@ -103,6 +103,16 @@ export async function updateStatus(id: number, status: Status): Promise<void> {
   await jsonOrThrow(res);
 }
 
+/** Super-admin only: reassign an application's campus. */
+export async function updateCampus(id: number, campus: string): Promise<void> {
+  const res = await fetch(`/api/applications/${id}/campus`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ campus }),
+  });
+  await jsonOrThrow(res);
+}
+
 export interface SalaryPayload {
   current_salary: string;
   expected_salary: string;
