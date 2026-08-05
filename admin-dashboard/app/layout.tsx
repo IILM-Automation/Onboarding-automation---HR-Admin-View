@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BTS — HR Admin Portal",
+  title: "Employment Application Portal",
   description: "HR admin dashboard for BTS employment applications.",
 };
 

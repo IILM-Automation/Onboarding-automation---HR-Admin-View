@@ -4,10 +4,17 @@ import { useState } from "react";
 import { login, checkSession, type Session } from "@/lib/client";
 
 type Scope = "admin" | "Delhi" | "Jaipur" | "Chandigarh";
+type Step = "landing" | "choose" | "auth";
 
-const CAMPUS_SCOPES: Scope[] = ["Delhi", "Jaipur", "Chandigarh"];
+const CAMPUSES: { scope: Scope; name: string; sub: string; emoji: string }[] = [
+  { scope: "Delhi", name: "Delhi", sub: "Campus login", emoji: "🏫" },
+  { scope: "Jaipur", name: "Jaipur", sub: "Campus login", emoji: "🏫" },
+  { scope: "Chandigarh", name: "Chandigarh", sub: "Campus login", emoji: "🏫" },
+  { scope: "admin", name: "Super Admin", sub: "All campuses", emoji: "🛡️" },
+];
 
 export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }) {
+  const [step, setStep] = useState<Step>("landing");
   const [scope, setScope] = useState<Scope | null>(null);
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -32,65 +39,86 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
     requestAnimationFrame(() => setShake(true));
   }
 
-  function pickScope(s: Scope | null) {
+  function pick(s: Scope) {
     setScope(s);
     setPw("");
     setErr("");
+    setStep("auth");
   }
 
   const label = (s: Scope) => (s === "admin" ? "Super Admin" : `BTS ${s}`);
 
+  const Logo = () =>
+    logoFail ? (
+      <div className="bts-logo-fallback">
+        <span className="blf-name">Banyan Tree School</span>
+        <span className="blf-motto">In Pursuit of Excellence</span>
+      </div>
+    ) : (
+      <div className="bts-logo-plate">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="bts-logo-img" src="/logos/bts.png" alt="Banyan Tree School" onError={() => setLogoFail(true)} />
+      </div>
+    );
+
   return (
     <div className="login">
-      <div
-        className={`login-card${shake ? " shake" : ""}`}
-        onAnimationEnd={(e) => {
-          if (e.animationName === "shake") setShake(false);
-        }}
-      >
-        {logoFail ? (
-          <>
-            <div className="wordmark">
-              <span className="wm-mark">F2F</span>
-            </div>
-            <div className="login-title">BTS &middot; IILM</div>
-          </>
-        ) : (
-          <div className="brand-plate">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="brand-logo" src="/logos/iilm.png" alt="IILM" onError={() => setLogoFail(true)} />
-            <span className="brand-div" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="brand-logo" src="/logos/bts.png" alt="Banyan Tree School" onError={() => setLogoFail(true)} />
+      <div className="aurora" aria-hidden="true">
+        <span className="orb orb-a" />
+        <span className="orb orb-b" />
+        <span className="orb orb-c" />
+      </div>
+
+      <div className={`login-card wide${shake ? " shake" : ""}`}
+        onAnimationEnd={(e) => { if (e.animationName === "shake") setShake(false); }}>
+
+        {/* ─────────── STEP 1 — LANDING ─────────── */}
+        {step === "landing" && (
+          <div className="step step-landing" key="landing">
+            <Logo />
+            <div className="landing-quote">“In Pursuit of Excellence”</div>
+            <h1 className="landing-title">Employment Application System</h1>
+            <p className="landing-sub">
+              Recruitment &amp; onboarding portal for Banyan Tree School campuses.
+            </p>
+            <button className="btn-primary btn-glow" onClick={() => setStep("choose")}>
+              Enter Portal →
+            </button>
           </div>
         )}
-        <div className="login-sub">HR &amp; Admin Portal</div>
 
-        {scope === null ? (
-          <>
-            <div className="role-prompt">Choose your campus</div>
-            <div className="role-grid">
-              {CAMPUS_SCOPES.map((s) => (
-                <button className="role-card" key={s} onClick={() => pickScope(s)}>
-                  <span className="role-emoji">🏫</span>
-                  <span className="role-name">{s}</span>
-                  <span className="role-desc">Banyan Tree School</span>
+        {/* ─────────── STEP 2 — CAMPUS CARDS ─────────── */}
+        {step === "choose" && (
+          <div className="step step-choose" key="choose">
+            <button className="ghost-back" onClick={() => setStep("landing")}>← Back</button>
+            <div className="choose-head">
+              <span className="choose-title">Select your access</span>
+              <span className="choose-sub">Choose a campus, or Super Admin for all campuses</span>
+            </div>
+            <div className="campus-grid">
+              {CAMPUSES.map((c) => (
+                <button
+                  key={c.scope}
+                  className={`campus-card${c.scope === "admin" ? " admin" : ""}`}
+                  onClick={() => pick(c.scope)}
+                >
+                  <span className="cc-emoji">{c.emoji}</span>
+                  <span className="cc-name">{c.name}</span>
+                  <span className="cc-sub">{c.sub}</span>
                 </button>
               ))}
-              <button className="role-card" onClick={() => pickScope("admin")}>
-                <span className="role-emoji">🛡️</span>
-                <span className="role-name">Super Admin</span>
-                <span className="role-desc">All campuses</span>
-              </button>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="role-chip">
-              <span>{scope === "admin" ? "🛡️ " : "🏫 "}{label(scope)}</span>
-              <button className="role-switch" onClick={() => pickScope(null)}>
-                Change
-              </button>
+          </div>
+        )}
+
+        {/* ─────────── STEP 3 — PASSWORD ─────────── */}
+        {step === "auth" && scope && (
+          <div className="step step-auth" key="auth">
+            <button className="ghost-back" onClick={() => { setStep("choose"); setErr(""); }}>← Back</button>
+            <Logo />
+            <div className="auth-scope">
+              <span className="auth-scope-emoji">{scope === "admin" ? "🛡️" : "🏫"}</span>
+              <span className="auth-scope-name">{label(scope)}</span>
             </div>
             <input
               type="password"
@@ -99,18 +127,16 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
               value={pw}
               autoFocus
               onChange={(e) => setPw(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submit();
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
             />
-            <button className="btn-primary" onClick={submit} disabled={busy}>
+            <button className="btn-primary btn-glow" onClick={submit} disabled={busy}>
               {busy ? "Signing in…" : "Sign In"}
             </button>
             <div className="login-err">{err}</div>
-          </>
+          </div>
         )}
 
-        <div className="login-foot">Authorised personnel only</div>
+        <div className="login-foot">Authorised personnel only · © {new Date().getFullYear()} Banyan Tree School</div>
       </div>
     </div>
   );

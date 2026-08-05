@@ -607,3 +607,114 @@ table.data tr:last-child td{border-bottom:none;}
   padding:2px 8px; border-radius:20px; cursor:pointer;
   background:#EEF2FF; color:#3730A3; border:1px solid #C7D2FE;
 }
+
+/* ============================================================
+   LOGIN REDESIGN — landing → campus cards → password
+   ============================================================ */
+.login-card.wide{ max-width: 468px; }
+
+/* Aurora orbs (richer animated backdrop, layered over the base gradient) */
+.aurora{ position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+.aurora .orb{ position:absolute; border-radius:50%; filter:blur(80px); opacity:.5; }
+.orb-a{ width:520px;height:520px; left:-140px; top:-160px;
+  background:radial-gradient(circle,#5BA0E8 0%,transparent 70%); animation:floatA 16s ease-in-out infinite; }
+.orb-b{ width:560px;height:560px; right:-180px; bottom:-200px;
+  background:radial-gradient(circle,#2C66BE 0%,transparent 70%); animation:floatB 20s ease-in-out infinite; }
+.orb-c{ width:360px;height:360px; left:40%; top:55%;
+  background:radial-gradient(circle,#7FB6F2 0%,transparent 70%); animation:floatA 24s ease-in-out infinite reverse; }
+.login-card{ position:relative; z-index:1; }
+
+/* Step container transition */
+.step{ display:flex; flex-direction:column; animation:stepIn .45s cubic-bezier(.16,.84,.44,1) both; }
+@keyframes stepIn{ from{opacity:0; transform:translateY(14px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);} }
+
+/* BTS logo on a white plate (blue logo needs light bg to read on glass) */
+.bts-logo-plate{
+  background:#fff; border-radius:16px; padding:18px 22px; margin:0 auto 18px;
+  box-shadow:0 12px 30px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.6);
+  display:flex; align-items:center; justify-content:center;
+}
+.bts-logo-img{ width:100%; max-width:300px; height:auto; display:block; }
+.bts-logo-fallback{
+  background:#fff; border-radius:16px; padding:20px; margin:0 auto 18px; text-align:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.28);
+}
+.blf-name{ display:block; color:#1E50A2; font-weight:900; font-size:22px; letter-spacing:.3px; }
+.blf-motto{ display:block; color:#2C66BE; font-style:italic; font-size:13px; margin-top:2px; }
+
+/* Landing */
+.landing-quote{ color:rgba(255,255,255,.85); font-style:italic; font-size:15px; margin:2px 0 10px; }
+.landing-title{ color:#fff; font-size:23px; font-weight:800; letter-spacing:.2px; margin:0 0 8px; line-height:1.25; }
+.landing-sub{ color:rgba(255,255,255,.7); font-size:13.5px; line-height:1.6; margin:0 0 26px; }
+
+/* Glowing primary button */
+.btn-glow{ position:relative; }
+.btn-glow::after{
+  content:""; position:absolute; inset:0; border-radius:12px;
+  box-shadow:0 0 0 0 rgba(91,160,232,.55); animation:glowPulse 2.6s ease-in-out infinite; pointer-events:none;
+}
+@keyframes glowPulse{ 0%,100%{box-shadow:0 0 0 0 rgba(91,160,232,.0);} 50%{box-shadow:0 0 22px 2px rgba(91,160,232,.45);} }
+
+/* Back link — in normal flow, pinned to the content's left edge */
+.ghost-back{
+  align-self:flex-start; margin:0 0 14px;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff;
+  font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px;
+}
+.ghost-back:hover{ background:rgba(255,255,255,.22); }
+
+/* Choose step */
+.choose-head{ margin:14px 0 16px; }
+.choose-title{ display:block; color:#fff; font-size:20px; font-weight:800; }
+.choose-sub{ display:block; color:rgba(255,255,255,.7); font-size:12.5px; margin-top:4px; }
+
+.campus-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.campus-card{
+  position:relative; overflow:hidden; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:4px; padding:20px 12px;
+  border-radius:16px; color:#fff; text-align:center;
+  background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.28);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .16s, background .2s, border-color .2s, box-shadow .2s;
+}
+.campus-card:hover{
+  transform:translateY(-3px); background:rgba(255,255,255,.18);
+  border-color:rgba(255,255,255,.6); box-shadow:0 12px 26px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.4);
+}
+/* sheen sweep on hover — the "shiny" feature */
+.campus-card::after{
+  content:""; position:absolute; top:0; left:-130%; width:60%; height:100%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transform:skewX(-20deg); transition:left .6s ease;
+}
+.campus-card:hover::after{ left:150%; }
+.campus-card.admin{
+  background:linear-gradient(150deg, rgba(217,119,6,.22), rgba(255,255,255,.10));
+  border-color:rgba(245,158,11,.55);
+}
+.cc-emoji{ font-size:26px; }
+.cc-name{ font-size:16px; font-weight:800; letter-spacing:.2px; }
+.cc-sub{ font-size:11px; color:rgba(255,255,255,.72); }
+
+/* Auth step scope chip */
+.auth-scope{
+  display:flex; align-items:center; justify-content:center; gap:8px; margin:4px 0 16px;
+  color:#fff; font-weight:800; font-size:16px;
+}
+.auth-scope-emoji{ font-size:18px; }
+
+/* Login: allow the card to scroll on short viewports instead of clipping */
+@media (max-height:680px){
+  .login{ align-items:flex-start; overflow-y:auto; }
+}
+@media (max-width:520px){
+  .login{ align-items:flex-start; overflow-y:auto; padding:16px; }
+  .login-card, .login-card.wide{ max-width:100%; padding:26px 20px 22px; }
+  .landing-title{ font-size:20px; }
+  .campus-grid{ grid-template-columns:1fr 1fr; gap:10px; }
+  .campus-card{ padding:16px 10px; }
+  .bts-logo-img{ max-width:230px; }
+}
+@media (max-width:380px){
+  .campus-grid{ grid-template-columns:1fr; }
+}
