@@ -464,16 +464,35 @@ table.data tr:last-child td{border-bottom:none;}
 
 /* Print view is hidden on screen; only revealed when printing */
 .print-root{display:none;}
+.notes-print-root{display:none;}
+.btn-print-notes{ background:var(--iilm); }
 
 @media print{
-  /* Hide the whole app, reveal only the print view */
-  body * { visibility:hidden; }
-  .print-root, .print-root * { visibility:visible; }
-  .print-root{
-    display:block !important;
-    position:absolute;left:0;top:0;width:100%;
-    color:#000;background:#fff;
-    font-size:11px;line-height:1.4;
+  /* Neutralise the app's fixed-height / scrolling containers so the FULL
+     document flows across pages instead of being clipped to one screen.
+     (The old position:absolute inside .detail-panel[overflow:auto;height:100vh]
+     was why only the first page printed.) */
+  html, body{ height:auto !important; overflow:visible !important; background:#fff !important; }
+  .shell, .list-panel, .detail-panel, .detail-inner{
+    height:auto !important; max-height:none !important; min-height:0 !important;
+    overflow:visible !important; position:static !important; transform:none !important;
+    display:block !important; width:auto !important; margin:0 !important;
+  }
+  .detail-inner{ padding:0 !important; max-width:none !important; }
+
+  /* Hide every on-screen element; only a print root should show */
+  .list-panel, .detail-toolbar, .detail-header, .tabs, .mobile-back, .nav-bar{ display:none !important; }
+  .detail-inner > *:not(.print-root):not(.notes-print-root){ display:none !important; }
+
+  /* Choose which print root renders. Default (no data-print / "full") =
+     the full application; data-print="notes" = the interview-notes sheet. */
+  .print-root, .notes-print-root{ display:none !important; }
+  body:not([data-print="notes"]) .print-root{ display:block !important; }
+  body[data-print="notes"] .notes-print-root{ display:block !important; }
+
+  .print-root, .notes-print-root{
+    position:static !important; width:100% !important;
+    color:#000; background:#fff; font-size:11px; line-height:1.4;
   }
   @page{ size:A4; margin:14mm; }
 

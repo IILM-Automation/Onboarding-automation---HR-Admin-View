@@ -13,6 +13,19 @@ import WorkTab from "./tabs/WorkTab";
 import CareerTab from "./tabs/CareerTab";
 import NotesTab from "./tabs/NotesTab";
 import PrintView from "./PrintView";
+import NotesPrintView from "./NotesPrintView";
+
+/** Print either the full application or just the interview notes.
+ *  A body[data-print] attribute tells the print stylesheet which root to show. */
+function downloadPdf(mode: "full" | "notes") {
+  document.body.setAttribute("data-print", mode);
+  const cleanup = () => {
+    document.body.removeAttribute("data-print");
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  window.print();
+}
 
 type TabKey = "overview" | "work" | "career" | "notes";
 
@@ -105,8 +118,11 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
             <button className="mobile-back" onClick={onBack}>
               ← Back to list
             </button>
-            <button className="btn-print" onClick={() => window.print()} title="Download / print a full PDF">
+            <button className="btn-print" onClick={() => downloadPdf("full")} title="Download the full application as PDF">
               ⬇ Download PDF
+            </button>
+            <button className="btn-print btn-print-notes" onClick={() => downloadPdf("notes")} title="Download the interview notes as PDF">
+              ⬇ Interview Notes PDF
             </button>
           </div>
 
@@ -181,8 +197,9 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
           {tab === "career" && <CareerTab app={detail} />}
           {tab === "notes" && <NotesTab app={detail} onSaved={(d) => setDetail(d)} />}
 
-          {/* Full record for printing / PDF — hidden on screen, shown in @media print */}
+          {/* Print roots — hidden on screen, shown in @media print by data-print mode */}
           <PrintView app={detail} />
+          <NotesPrintView app={detail} />
         </div>
       )}
     </main>
