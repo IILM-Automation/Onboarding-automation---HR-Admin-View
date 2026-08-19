@@ -18,6 +18,14 @@ export type Campus = (typeof CAMPUSES)[number];
 /** A login scope: the super-admin, or one campus. */
 export type Scope = "admin" | Campus;
 
+/**
+ * Which door of a campus you are entering:
+ *   dashboard -> HR candidate dashboard (salary visible)
+ *   interview -> standalone interview panel (salary hidden)
+ * Super-admin has no interview panel.
+ */
+export type LoginMode = "dashboard" | "interview";
+
 export const config = {
   /** FastAPI backend base URL, e.g. https://apps.iilm.edu/bts-api */
   apiBase: (process.env.BTS_API_BASE || "").replace(/\/$/, ""),
@@ -34,7 +42,7 @@ export const config = {
     `bts-session::${process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD}`,
 };
 
-export type Role = "admin" | "hr";
+export type Role = "admin" | "hr" | "interviewer";
 
 export function isCampus(v: unknown): v is Campus {
   return typeof v === "string" && (CAMPUSES as readonly string[]).includes(v);
@@ -51,6 +59,24 @@ export function campusPassword(campus: Campus): string {
 /** Password for any login scope. */
 export function passwordForScope(scope: Scope): string {
   return scope === "admin" ? config.adminPassword : campusPassword(scope);
+}
+
+/**
+ * Interview-panel password for a campus — env `BTS_<CAMPUS>_INTERVIEWER_PASSWORD`,
+ * dev fallback `bts_<campus>_interview_2024`. Deliberately distinct from the
+ * campus HR password so interviewers never hold dashboard (salary) access.
+ */
+export function interviewerPassword(campus: Campus): string {
+  return (
+    process.env[`BTS_${campus.toUpperCase()}_INTERVIEWER_PASSWORD`] ||
+    `bts_${campus.toLowerCase()}_interview_2024`
+  );
+}
+
+/** Password for a scope + door. */
+export function passwordForLogin(scope: Scope, mode: LoginMode): string {
+  if (scope === "admin") return config.adminPassword;
+  return mode === "interview" ? interviewerPassword(scope) : campusPassword(scope);
 }
 
 /** Throws a descriptive error if the backend env vars are missing. */

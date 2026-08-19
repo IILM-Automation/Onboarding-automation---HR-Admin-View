@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { checkSession, type Session } from "@/lib/client";
 import Login from "@/components/Login";
 import Dashboard from "@/components/Dashboard";
+import InterviewerPanel from "@/components/InterviewerPanel";
 import { ToastProvider } from "@/components/Toast";
 
 export default function Page() {
@@ -26,6 +27,8 @@ export default function Page() {
     <ToastProvider>
       {session === null ? (
         <Login onSuccess={setSession} />
+      ) : session.role === "interviewer" ? (
+        <InterviewerPanel session={session} onLogout={() => setSession(null)} />
       ) : (
         <Dashboard session={session} onLogout={() => setSession(null)} />
       )}

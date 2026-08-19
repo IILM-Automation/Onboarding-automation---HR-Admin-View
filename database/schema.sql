@@ -196,3 +196,60 @@ DROP INDEX IF EXISTS idx_tokens_active_email_org;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_active_email_org_campus
     ON bts_form_tokens (email, org, campus)
     WHERE status NOT IN ('submitted', 'expired');
+
+-- ============================================================
+-- PART 6: INTERVIEW NOTES — one row per interviewer per candidate
+--
+-- Replaces the single bts_applications.interview_rounds JSONB array, which
+-- could not support a panel: the whole array was rewritten on every save, so
+-- three interviewers saving at once meant the last write erased the others.
+-- Each panelist now owns their own row.
+--
+-- The legacy interview_rounds column is intentionally LEFT IN PLACE as a
+-- read-only backup of the pre-migration data.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bts_interview_notes (
+    id                  SERIAL PRIMARY KEY,
+    application_id      INTEGER NOT NULL REFERENCES bts_applications(id) ON DELETE CASCADE,
+    campus              TEXT,
+    round_no            INTEGER,
+    interviewed_by      TEXT NOT NULL,
+    interviewed_on      DATE,
+    interview_mode      TEXT,           -- Physical | Online
+    employment_type     TEXT,           -- Full Time | Part Time
+    designation_offered TEXT,
+    date_of_joining     DATE,
+    notes               TEXT,
+    -- The interviewer's OWN observed/recommended figure. HR's confidential
+    -- salary block (bts_applications.current_salary etc.) is never shown to
+    -- interviewers — the backend strips it based on the X-Role header.
+    recommended_salary  TEXT,
+    source              TEXT DEFAULT 'interviewer',   -- migrated | interviewer | hr | admin
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_application ON bts_interview_notes(application_id);
+CREATE INDEX IF NOT EXISTS idx_notes_campus      ON bts_interview_notes(campus);
+CREATE INDEX IF NOT EXISTS idx_notes_by          ON bts_interview_notes(application_id, lower(interviewed_by));
+
+-- One-time migration of the legacy JSONB rounds into the new table.
+-- Safe to re-run: it only fires when the table is still empty.
+INSERT INTO bts_interview_notes
+  (application_id, campus, round_no, interviewed_by, interviewed_on, interview_mode,
+   employment_type, designation_offered, date_of_joining, notes, source, created_at)
+SELECT a.id, a.campus,
+       NULLIF(e->>'round','')::int,
+       trim(e->>'interviewed_by'),
+       NULLIF(e->>'interviewed_on','')::date,
+       NULLIF(e->>'interview_mode',''),
+       NULLIF(e->>'employment_type',''),
+       NULLIF(e->>'designation_offered',''),
+       NULLIF(e->>'date_of_joining','')::date,
+       e->>'notes',
+       'migrated',
+       COALESCE(a.created_at, NOW())
+FROM bts_applications a,
+     jsonb_array_elements(COALESCE(a.interview_rounds,'[]'::jsonb)) e
+WHERE COALESCE(trim(e->>'interviewed_by'),'') <> ''
+  AND NOT EXISTS (SELECT 1 FROM bts_interview_notes);

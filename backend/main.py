@@ -214,6 +214,44 @@ def _campus_scope(x_campus: Optional[str]) -> Optional[str]:
     return x_campus if x_campus in _CAMPUSES else None
 
 
+# ------------------------------------------------------------
+# Role scoping. The admin dashboard proxy derives X-Role from the signed
+# session cookie, so the browser cannot forge it.
+#   admin / hr   -> full access within their campus scope
+#   interviewer  -> candidate details WITHOUT salary; may only write their
+#                   own interview-note row. No status/campus/salary/invite.
+# ------------------------------------------------------------
+_ROLES = {"admin", "hr", "interviewer"}
+
+# Confidential fields an interviewer must never receive.
+_SALARY_FIELDS = (
+    "current_salary",
+    "expected_salary",
+    "ctc_offered",
+    "salary_notes",
+    "salary_updated_at",
+)
+
+
+def _role(x_role: Optional[str]) -> str:
+    """Trusted caller role; anything unknown falls back to the least-privileged."""
+    return x_role if x_role in _ROLES else "hr"
+
+
+def _is_interviewer(x_role: Optional[str]) -> bool:
+    return _role(x_role) == "interviewer"
+
+
+def _require_not_interviewer(x_role: Optional[str], what: str) -> None:
+    if _is_interviewer(x_role):
+        raise HTTPException(status_code=403, detail=f"Interviewers cannot {what}.")
+
+
+def _strip_salary(row: dict) -> dict:
+    """Remove confidential salary fields from an outgoing record."""
+    return {k: v for k, v in row.items() if k not in _SALARY_FIELDS}
+
+
 class StatusUpdate(BaseModel):
     status: str
 
@@ -229,6 +267,27 @@ class SalaryUpdate(BaseModel):
     salary_notes: Optional[str] = None
     # Multi-round interviewer notes (list of round objects).
     interview_rounds: Optional[list] = None
+
+
+class NoteUpsert(BaseModel):
+    """One interviewer's note for one candidate.
+
+    Stored as its own row in bts_interview_notes so several panelists can
+    save concurrently without overwriting each other.
+    """
+    interviewed_by: str
+    interviewed_on: Optional[str] = None
+    interview_mode: Optional[str] = None
+    employment_type: Optional[str] = None
+    designation_offered: Optional[str] = None
+    date_of_joining: Optional[str] = None
+    notes: Optional[str] = None
+    # The interviewer's OWN observed/recommended figure. Never exposes HR's
+    # confidential salary block.
+    recommended_salary: Optional[str] = None
+    # Update an existing row when given; otherwise upsert by interviewer name.
+    note_id: Optional[int] = None
+    force_new: Optional[bool] = False
 
 
 def _serialize(row: dict) -> dict:
@@ -318,11 +377,15 @@ def get_application(
     app_id: int,
     x_api_key: Optional[str] = Header(None),
     x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
 ):
     """Full detail for one application, including JSONB sections + photo.
 
     Campus isolation: a campus-scoped caller can only read rows for its
     own campus; anything else returns 404 (indistinguishable from missing).
+
+    Confidentiality: an interviewer never receives the salary fields — they
+    are stripped server-side, so they never reach the browser at all.
     """
     require_api_key(x_api_key)
     scope = _campus_scope(x_campus)
@@ -340,7 +403,10 @@ def get_application(
             row = cur.fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="application not found")
-        return _serialize(row)
+        out = _serialize(row)
+        if _is_interviewer(x_role):
+            out = _strip_salary(out)
+        return out
     finally:
         conn.close()
 
@@ -351,9 +417,11 @@ def update_status(
     body: StatusUpdate,
     x_api_key: Optional[str] = Header(None),
     x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
 ):
-    """Update an application's lifecycle status (campus-scoped)."""
+    """Update an application's lifecycle status (campus-scoped, not interviewers)."""
     require_api_key(x_api_key)
+    _require_not_interviewer(x_role, "change a candidate's status")
     scope = _campus_scope(x_campus)
 
     if body.status not in _STATUSES:
@@ -417,9 +485,11 @@ def update_salary(
     body: SalaryUpdate,
     x_api_key: Optional[str] = Header(None),
     x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
 ):
-    """Fill / update salary + interviewer-notes fields (campus-scoped)."""
+    """Fill / update the confidential salary block. HR / super-admin only."""
     require_api_key(x_api_key)
+    _require_not_interviewer(x_role, "view or edit salary details")
     scope = _campus_scope(x_campus)
 
     sql = """
@@ -462,6 +532,201 @@ def update_salary(
 
 
 # ============================================================
+# INTERVIEW NOTES — one row per interviewer per candidate.
+#
+# Each panelist writes only their own row, so three interviewers can save
+# at the same time without overwriting one another (the old single-JSONB
+# array could not do this — the last save won and erased the rest).
+# ============================================================
+
+def _assert_application_visible(cur, app_id: int, scope: Optional[str]) -> dict:
+    """Fetch the application within the caller's campus scope, or 404."""
+    sql = "SELECT id, campus FROM bts_applications WHERE id = %s"
+    params: list = [app_id]
+    if scope:
+        sql += " AND campus = %s"
+        params.append(scope)
+    cur.execute(sql, params)
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="application not found")
+    return row
+
+
+@app.get("/applications/{app_id}/notes")
+def list_notes(
+    app_id: int,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+):
+    """All interview notes for one candidate, oldest first. Campus-scoped."""
+    require_api_key(x_api_key)
+    scope = _campus_scope(x_campus)
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            _assert_application_visible(cur, app_id, scope)
+            cur.execute(
+                """
+                SELECT id, application_id, campus, round_no, interviewed_by,
+                       interviewed_on, interview_mode, employment_type,
+                       designation_offered, date_of_joining, notes,
+                       recommended_salary, source, created_at, updated_at
+                FROM bts_interview_notes
+                WHERE application_id = %s
+                ORDER BY COALESCE(interviewed_on, created_at::date), id
+                """,
+                (app_id,),
+            )
+            rows = cur.fetchall()
+        return {"notes": [_serialize(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@app.put("/applications/{app_id}/notes")
+def upsert_note(
+    app_id: int,
+    body: NoteUpsert,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+):
+    """Create or update ONE interviewer's note row.
+
+    Resolution order:
+      * note_id given            -> update exactly that row
+      * force_new                -> always insert a new row
+      * otherwise                -> update this interviewer's existing row
+                                    for the candidate, else insert.
+
+    An interviewer may only touch a row that carries their own name, so one
+    panelist can never edit another panelist's assessment.
+    """
+    require_api_key(x_api_key)
+    scope = _campus_scope(x_campus)
+    role = _role(x_role)
+
+    who = (body.interviewed_by or "").strip()
+    if not who:
+        raise HTTPException(status_code=400, detail="'Interviewed by' is required.")
+    if not (body.interviewed_on or "").strip():
+        raise HTTPException(status_code=400, detail="'Interviewed on' is required.")
+
+    fields = (
+        who,
+        (body.interviewed_on or "").strip() or None,
+        (body.interview_mode or "").strip() or None,
+        (body.employment_type or "").strip() or None,
+        (body.designation_offered or "").strip() or None,
+        (body.date_of_joining or "").strip() or None,
+        body.notes,
+        (body.recommended_salary or "").strip() or None,
+    )
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            app_row = _assert_application_visible(cur, app_id, scope)
+
+            target_id = body.note_id
+            if target_id is None and not body.force_new:
+                cur.execute(
+                    """
+                    SELECT id FROM bts_interview_notes
+                    WHERE application_id = %s AND lower(trim(interviewed_by)) = lower(%s)
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (app_id, who),
+                )
+                existing = cur.fetchone()
+                if existing:
+                    target_id = existing["id"]
+
+            if target_id is not None:
+                # Interviewers may only edit a row bearing their own name.
+                cur.execute(
+                    "SELECT id, interviewed_by FROM bts_interview_notes WHERE id = %s AND application_id = %s",
+                    (target_id, app_id),
+                )
+                owner = cur.fetchone()
+                if owner is None:
+                    raise HTTPException(status_code=404, detail="note not found")
+                if role == "interviewer" and (owner["interviewed_by"] or "").strip().lower() != who.lower():
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You can only edit your own interview note.",
+                    )
+                cur.execute(
+                    """
+                    UPDATE bts_interview_notes
+                    SET interviewed_by = %s,
+                        interviewed_on = NULLIF(%s,'')::date,
+                        interview_mode = %s,
+                        employment_type = %s,
+                        designation_offered = %s,
+                        date_of_joining = NULLIF(%s,'')::date,
+                        notes = %s,
+                        recommended_salary = %s,
+                        updated_at = NOW()
+                    WHERE id = %s
+                    RETURNING id
+                    """,
+                    fields + (target_id,),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO bts_interview_notes
+                      (application_id, campus, interviewed_by, interviewed_on,
+                       interview_mode, employment_type, designation_offered,
+                       date_of_joining, notes, recommended_salary, source, round_no)
+                    VALUES (%s, %s, %s, NULLIF(%s,'')::date, %s, %s, %s,
+                            NULLIF(%s,'')::date, %s, %s, %s,
+                            (SELECT COALESCE(MAX(round_no), 0) + 1
+                               FROM bts_interview_notes WHERE application_id = %s))
+                    RETURNING id
+                    """,
+                    (app_id, app_row["campus"]) + fields + (role, app_id),
+                )
+            saved = cur.fetchone()
+            conn.commit()
+        return {"success": True, "id": saved["id"]}
+    finally:
+        conn.close()
+
+
+@app.delete("/applications/{app_id}/notes/{note_id}")
+def delete_note(
+    app_id: int,
+    note_id: int,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+):
+    """Remove an interview note. HR / super-admin only."""
+    require_api_key(x_api_key)
+    _require_not_interviewer(x_role, "delete interview notes")
+    scope = _campus_scope(x_campus)
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            _assert_application_visible(cur, app_id, scope)
+            cur.execute(
+                "DELETE FROM bts_interview_notes WHERE id = %s AND application_id = %s",
+                (note_id, app_id),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="note not found")
+            conn.commit()
+        return {"success": True}
+    finally:
+        conn.close()
+
+
+# ============================================================
 # PART 4: HR INVITE ENDPOINT (require X-API-Key)
 # ============================================================
 
@@ -496,6 +761,7 @@ def create_invite(
     body: InviteCreate,
     x_api_key: Optional[str] = Header(None),
     x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
 ):
     """
     HR adds an arrived candidate's email. We forward it to the n8n invite
@@ -509,6 +775,7 @@ def create_invite(
         against two truly-concurrent active inserts.
     """
     require_api_key(x_api_key)
+    _require_not_interviewer(x_role, "invite candidates")
 
     email = (body.email or "").strip().lower()
     position = (body.position or "").strip()

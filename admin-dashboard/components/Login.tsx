@@ -1,21 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { login, checkSession, type Session } from "@/lib/client";
+import { login, checkSession, type Session, type LoginMode } from "@/lib/client";
 
 type Scope = "admin" | "Delhi" | "Jaipur" | "Chandigarh";
-type Step = "landing" | "choose" | "auth";
+type Step = "landing" | "campus" | "door" | "auth";
 
-const CAMPUSES: { scope: Scope; name: string; sub: string; emoji: string }[] = [
-  { scope: "Delhi", name: "Delhi", sub: "Campus login", emoji: "🏫" },
-  { scope: "Jaipur", name: "Jaipur", sub: "Campus login", emoji: "🏫" },
-  { scope: "Chandigarh", name: "Chandigarh", sub: "Campus login", emoji: "🏫" },
-  { scope: "admin", name: "Super Admin", sub: "All campuses", emoji: "🛡️" },
-];
+const CAMPUSES: Scope[] = ["Delhi", "Jaipur", "Chandigarh"];
 
 export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }) {
   const [step, setStep] = useState<Step>("landing");
   const [scope, setScope] = useState<Scope | null>(null);
+  const [mode, setMode] = useState<LoginMode>("dashboard");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [shake, setShake] = useState(false);
@@ -26,7 +22,7 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
     if (busy || !scope) return;
     setBusy(true);
     setErr("");
-    const ok = await login(scope, pw);
+    const ok = await login(scope, pw, mode);
     if (ok) {
       const s = await checkSession();
       setBusy(false);
@@ -39,14 +35,28 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
     requestAnimationFrame(() => setShake(true));
   }
 
-  function pick(s: Scope) {
+  /** Super Admin has no interview panel — go straight to the password. */
+  function pickScope(s: Scope) {
     setScope(s);
+    setPw("");
+    setErr("");
+    if (s === "admin") {
+      setMode("dashboard");
+      setStep("auth");
+    } else {
+      setStep("door");
+    }
+  }
+
+  function pickDoor(m: LoginMode) {
+    setMode(m);
     setPw("");
     setErr("");
     setStep("auth");
   }
 
-  const label = (s: Scope) => (s === "admin" ? "Super Admin" : `BTS ${s}`);
+  const scopeLabel = scope === "admin" ? "Super Admin" : `BTS ${scope}`;
+  const doorLabel = mode === "interview" ? "Interview Panel" : "Candidate Dashboard";
 
   const Logo = () =>
     logoFail ? (
@@ -69,57 +79,90 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
         <span className="orb orb-c" />
       </div>
 
-      <div className={`login-card wide${shake ? " shake" : ""}`}
-        onAnimationEnd={(e) => { if (e.animationName === "shake") setShake(false); }}>
-
-        {/* ─────────── STEP 1 — LANDING ─────────── */}
+      <div
+        className={`login-card wide${shake ? " shake" : ""}`}
+        onAnimationEnd={(e) => { if (e.animationName === "shake") setShake(false); }}
+      >
+        {/* ─────────── LANDING ─────────── */}
         {step === "landing" && (
-          <div className="step step-landing" key="landing">
+          <div className="step" key="landing">
             <Logo />
             <div className="landing-quote">“In Pursuit of Excellence”</div>
             <h1 className="landing-title">Employment Application System</h1>
             <p className="landing-sub">
               Recruitment &amp; onboarding portal for Banyan Tree School campuses.
             </p>
-            <button className="btn-primary btn-glow" onClick={() => setStep("choose")}>
+            <button className="btn-primary btn-glow" onClick={() => setStep("campus")}>
               Enter Portal →
             </button>
           </div>
         )}
 
-        {/* ─────────── STEP 2 — CAMPUS CARDS ─────────── */}
-        {step === "choose" && (
-          <div className="step step-choose" key="choose">
+        {/* ─────────── CAMPUS ─────────── */}
+        {step === "campus" && (
+          <div className="step" key="campus">
             <button className="ghost-back" onClick={() => setStep("landing")}>← Back</button>
             <div className="choose-head">
-              <span className="choose-title">Select your access</span>
+              <span className="choose-title">Select your campus</span>
               <span className="choose-sub">Choose a campus, or Super Admin for all campuses</span>
             </div>
             <div className="campus-grid">
               {CAMPUSES.map((c) => (
-                <button
-                  key={c.scope}
-                  className={`campus-card${c.scope === "admin" ? " admin" : ""}`}
-                  onClick={() => pick(c.scope)}
-                >
-                  <span className="cc-emoji">{c.emoji}</span>
-                  <span className="cc-name">{c.name}</span>
-                  <span className="cc-sub">{c.sub}</span>
+                <button key={c} className="campus-card" onClick={() => pickScope(c)}>
+                  <span className="cc-emoji">🏫</span>
+                  <span className="cc-name">{c}</span>
+                  <span className="cc-sub">Banyan Tree School</span>
                 </button>
               ))}
+              <button className="campus-card admin" onClick={() => pickScope("admin")}>
+                <span className="cc-emoji">🛡️</span>
+                <span className="cc-name">Super Admin</span>
+                <span className="cc-sub">All campuses</span>
+              </button>
             </div>
           </div>
         )}
 
-        {/* ─────────── STEP 3 — PASSWORD ─────────── */}
+        {/* ─────────── DOOR: dashboard vs interview ─────────── */}
+        {step === "door" && scope && (
+          <div className="step" key="door">
+            <button className="ghost-back" onClick={() => setStep("campus")}>← Back</button>
+            <div className="choose-head">
+              <span className="choose-title">BTS {scope}</span>
+              <span className="choose-sub">What would you like to do?</span>
+            </div>
+            <div className="door-grid">
+              <button className="campus-card door" onClick={() => pickDoor("dashboard")}>
+                <span className="cc-emoji">📋</span>
+                <span className="cc-name">Candidate Dashboard</span>
+                <span className="cc-sub">Full records, compensation &amp; hiring status</span>
+              </button>
+              <button className="campus-card door interview" onClick={() => pickDoor("interview")}>
+                <span className="cc-emoji">🎤</span>
+                <span className="cc-name">Start an Interview</span>
+                <span className="cc-sub">Panel view — record your interview notes</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────── PASSWORD ─────────── */}
         {step === "auth" && scope && (
-          <div className="step step-auth" key="auth">
-            <button className="ghost-back" onClick={() => { setStep("choose"); setErr(""); }}>← Back</button>
+          <div className="step" key="auth">
+            <button
+              className="ghost-back"
+              onClick={() => { setStep(scope === "admin" ? "campus" : "door"); setErr(""); }}
+            >
+              ← Back
+            </button>
             <Logo />
             <div className="auth-scope">
-              <span className="auth-scope-emoji">{scope === "admin" ? "🛡️" : "🏫"}</span>
-              <span className="auth-scope-name">{label(scope)}</span>
+              <span className="auth-scope-emoji">
+                {scope === "admin" ? "🛡️" : mode === "interview" ? "🎤" : "📋"}
+              </span>
+              <span className="auth-scope-name">{scopeLabel}</span>
             </div>
+            {scope !== "admin" && <div className="auth-door">{doorLabel}</div>}
             <input
               type="password"
               placeholder="Enter password"
@@ -136,7 +179,9 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
           </div>
         )}
 
-        <div className="login-foot">Authorised personnel only · © {new Date().getFullYear()} Banyan Tree School</div>
+        <div className="login-foot">
+          Authorised personnel only · © {new Date().getFullYear()} Banyan Tree School
+        </div>
       </div>
     </div>
   );

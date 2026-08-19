@@ -91,6 +91,29 @@ export interface PrevInterview {
   position?: string;
   location?: string;
 }
+/**
+ * One interviewer's note for one candidate — a row in bts_interview_notes.
+ * Each panelist owns their own row, so simultaneous saves never collide.
+ */
+export interface InterviewNote {
+  id?: number;
+  application_id?: number;
+  campus?: string | null;
+  round_no?: number | null;
+  interviewed_by?: string;
+  interviewed_on?: string | null;
+  interview_mode?: string | null;
+  employment_type?: string | null;
+  designation_offered?: string | null;
+  date_of_joining?: string | null;
+  notes?: string | null;
+  /** The interviewer's own observed/recommended figure (not HR's salary block). */
+  recommended_salary?: string | null;
+  source?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface OrgRelative {
   name?: string;
   relationship?: string;

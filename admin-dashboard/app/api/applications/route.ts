@@ -5,5 +5,6 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const qs = req.nextUrl.searchParams.toString();
-  return proxy("/applications" + (qs ? `?${qs}` : ""), { roles: ["admin", "hr"] });
+  // Interviewers may list candidates; the backend strips salary for them.
+  return proxy("/applications" + (qs ? `?${qs}` : ""), { roles: ["admin", "hr", "interviewer"] });
 }

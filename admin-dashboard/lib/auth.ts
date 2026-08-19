@@ -14,10 +14,11 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import {
   config,
-  passwordForScope,
+  passwordForLogin,
   isCampus,
   type Role,
   type Scope,
+  type LoginMode,
 } from "./config";
 
 export const SESSION_COOKIE = "bts_admin_session";
@@ -29,8 +30,9 @@ export interface Session {
   campus: CampusScope;
 }
 
-function roleCampusForScope(scope: Scope): Session {
-  return scope === "admin" ? { role: "admin", campus: "all" } : { role: "hr", campus: scope };
+function roleCampusForLogin(scope: Scope, mode: LoginMode): Session {
+  if (scope === "admin") return { role: "admin", campus: "all" };
+  return { role: mode === "interview" ? "interviewer" : "hr", campus: scope };
 }
 
 function expectedToken(role: Role, campus: CampusScope): string {
@@ -46,10 +48,10 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb);
 }
 
-/** Validate a scope password and return the cookie value to store, or null. */
-export function issueSession(scope: Scope, password: string): string | null {
-  if (!password || !safeEqual(password, passwordForScope(scope))) return null;
-  const { role, campus } = roleCampusForScope(scope);
+/** Validate a scope+mode password and return the cookie value to store, or null. */
+export function issueSession(scope: Scope, mode: LoginMode, password: string): string | null {
+  if (!password || !safeEqual(password, passwordForLogin(scope, mode))) return null;
+  const { role, campus } = roleCampusForLogin(scope, mode);
   return `${role}:${campus}:${expectedToken(role, campus)}`;
 }
 
@@ -61,10 +63,10 @@ export async function getSession(): Promise<Session | null> {
   const parts = raw.split(":");
   if (parts.length !== 3) return null;
   const [role, campus, token] = parts;
-  if (role !== "admin" && role !== "hr") return null;
+  if (role !== "admin" && role !== "hr" && role !== "interviewer") return null;
   if (campus !== "all" && !isCampus(campus)) return null;
-  // admin must be "all"; hr must be a real campus — bind the two together.
+  // admin must be "all"; hr/interviewer must be a real campus — bind them together.
   if (role === "admin" && campus !== "all") return null;
-  if (role === "hr" && campus === "all") return null;
+  if (role !== "admin" && campus === "all") return null;
   return safeEqual(token, expectedToken(role as Role, campus)) ? { role: role as Role, campus } : null;
 }

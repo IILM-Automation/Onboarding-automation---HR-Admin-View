@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApplication, updateStatus, updateCampus } from "@/lib/client";
+import { fetchApplication, updateStatus, updateCampus, fetchNotes } from "@/lib/client";
+import type { InterviewNote } from "@/lib/types";
 import type { AppDetail as Detail, Status } from "@/lib/types";
 import { STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
 
@@ -40,6 +41,10 @@ interface Props {
 export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampusChange }: Props) {
   const toast = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
+  // Notes live in their own table now. Fetched ONCE here and shared with both
+  // the Notes tab and the PDF views (one round trip, not two).
+  const [printNotes, setPrintNotes] = useState<InterviewNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<TabKey>("overview");
   const [error, setError] = useState("");
@@ -47,6 +52,7 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
   useEffect(() => {
     if (id === null) {
       setDetail(null);
+      setPrintNotes([]);
       return;
     }
     let cancelled = false;
@@ -54,6 +60,12 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
     setError("");
     setTab("overview");
     setDetail(null);
+    setPrintNotes([]);
+    setNotesLoading(true);
+    fetchNotes(id)
+      .then((n) => { if (!cancelled) setPrintNotes(n); })
+      .catch(() => { /* PDF / notes tab simply show empty if this fails */ })
+      .finally(() => { if (!cancelled) setNotesLoading(false); });
     fetchApplication(id)
       .then((d) => {
         if (!cancelled) setDetail(d);
@@ -195,11 +207,19 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
           {tab === "overview" && <OverviewTab app={detail} />}
           {tab === "work" && <WorkTab app={detail} />}
           {tab === "career" && <CareerTab app={detail} />}
-          {tab === "notes" && <NotesTab app={detail} onSaved={(d) => setDetail(d)} />}
+          {tab === "notes" && (
+            <NotesTab
+              app={detail}
+              notes={printNotes}
+              notesLoading={notesLoading}
+              onSaved={(d) => setDetail(d)}
+              onNotesChange={setPrintNotes}
+            />
+          )}
 
           {/* Print roots — hidden on screen, shown in @media print by data-print mode */}
-          <PrintView app={detail} />
-          <NotesPrintView app={detail} />
+          <PrintView app={detail} notes={printNotes} />
+          <NotesPrintView app={detail} notes={printNotes} />
         </div>
       )}
     </main>

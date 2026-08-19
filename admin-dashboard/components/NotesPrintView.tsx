@@ -1,4 +1,4 @@
-import type { AppDetail } from "@/lib/types";
+import type { AppDetail, InterviewNote } from "@/lib/types";
 import { fmtDate, fmtDateTime, fullName, has } from "@/lib/format";
 import { STATUS_LABELS } from "@/lib/types";
 
@@ -18,21 +18,15 @@ function Row({ label, value, full }: { label: string; value: React.ReactNode; fu
   );
 }
 
-export default function NotesPrintView({ app }: { app: AppDetail }) {
-  // Rounds, with a fallback to the legacy single-round columns.
-  let rounds = app.interview_rounds || [];
-  if (!rounds.length && (has(app.interviewed_by) || has(app.date_of_interview) || has(app.interviewer_notes))) {
-    rounds = [{
-      round: 1,
-      interviewed_by: app.interviewed_by || "",
-      interviewed_on: app.date_of_interview || "",
-      interview_mode: app.interview_mode || "",
-      employment_type: app.employment_type || "",
-      designation_offered: app.designation_offered || "",
-      date_of_joining: app.date_of_joining || "",
-      notes: app.interviewer_notes || "",
-    }];
-  }
+export default function NotesPrintView({
+  app,
+  notes = [],
+}: {
+  app: AppDetail;
+  notes?: InterviewNote[];
+}) {
+  // Prefer the notes table; fall back to the legacy JSONB rounds.
+  const rounds: InterviewNote[] = notes.length ? notes : app.interview_rounds || [];
 
   const hasSalary = has(app.current_salary) || has(app.expected_salary) || has(app.salary_notes);
 
@@ -66,7 +60,10 @@ export default function NotesPrintView({ app }: { app: AppDetail }) {
         {rounds.length ? (
           rounds.map((r, i) => (
             <div className="pv-emp" key={i}>
-              <h3 className="pv-h3">Round {r.round ?? i + 1}</h3>
+              <h3 className="pv-h3">
+                {has(r.interviewed_by) ? r.interviewed_by : `Panelist ${i + 1}`}
+                {r.round_no ? ` · Round ${r.round_no}` : ""}
+              </h3>
               <div className="pv-grid">
                 <Row label="Interviewed by" value={r.interviewed_by} />
                 <Row label="Interviewed on" value={fmtDate(r.interviewed_on)} />
@@ -74,6 +71,9 @@ export default function NotesPrintView({ app }: { app: AppDetail }) {
                 <Row label="Employment type" value={r.employment_type} />
                 <Row label="Designation offered" value={r.designation_offered} />
                 <Row label="Date of joining" value={fmtDate(r.date_of_joining)} />
+                {has(r.recommended_salary) && (
+                  <Row label="Salary discussed (₹)" value={r.recommended_salary} />
+                )}
                 <Row label="Notes" value={r.notes} full />
               </div>
             </div>

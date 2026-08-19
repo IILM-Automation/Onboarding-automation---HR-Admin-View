@@ -3,7 +3,7 @@
  * handlers (same-origin, cookie-authenticated). The backend URL and
  * API key live only on the server — never here.
  */
-import type { AppDetail, AppListItem, InterviewRound, Status } from "./types";
+import type { AppDetail, AppListItem, InterviewNote, InterviewRound, Status } from "./types";
 
 async function jsonOrThrow(res: Response) {
   let data: any = {};
@@ -18,7 +18,7 @@ async function jsonOrThrow(res: Response) {
   return data;
 }
 
-export type Role = "admin" | "hr";
+export type Role = "admin" | "hr" | "interviewer";
 /** "all" for super-admin, else a campus name (Delhi/Jaipur/Chandigarh). */
 export type CampusScope = string;
 export type Scope = "admin" | string;
@@ -38,13 +38,45 @@ export async function checkSession(): Promise<Session | null> {
   }
 }
 
-export async function login(scope: Scope, password: string): Promise<boolean> {
+export type LoginMode = "dashboard" | "interview";
+
+export async function login(
+  scope: Scope,
+  password: string,
+  mode: LoginMode = "dashboard"
+): Promise<boolean> {
   const res = await fetch("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scope, password }),
+    body: JSON.stringify({ scope, password, mode }),
   });
   return res.ok;
+}
+
+/** All panelists' notes for a candidate. */
+export async function fetchNotes(appId: number): Promise<InterviewNote[]> {
+  const res = await fetch(`/api/applications/${appId}/notes`, { cache: "no-store" });
+  const data = await jsonOrThrow(res);
+  return data.notes || [];
+}
+
+/** Create / update one interviewer's note row. */
+export async function saveNote(
+  appId: number,
+  note: InterviewNote & { force_new?: boolean }
+): Promise<{ id: number }> {
+  const res = await fetch(`/api/applications/${appId}/notes`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(note),
+  });
+  return jsonOrThrow(res);
+}
+
+/** Delete one note (HR / super-admin only). */
+export async function deleteNote(appId: number, noteId: number): Promise<void> {
+  const res = await fetch(`/api/applications/${appId}/notes/${noteId}`, { method: "DELETE" });
+  await jsonOrThrow(res);
 }
 
 export interface InviteResult {
@@ -113,12 +145,17 @@ export async function updateCampus(id: number, campus: string): Promise<void> {
   await jsonOrThrow(res);
 }
 
+/**
+ * Confidential salary block only. Interview notes are saved separately via
+ * saveNote() so panelists can never overwrite each other.
+ */
 export interface SalaryPayload {
   current_salary: string;
   expected_salary: string;
   ctc_offered: string;
   salary_notes: string;
-  interview_rounds: InterviewRound[];
+  /** Legacy JSONB rounds — no longer written by the UI. */
+  interview_rounds?: InterviewRound[];
 }
 
 export async function updateSalary(

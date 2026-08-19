@@ -35,9 +35,11 @@ export async function proxy(path: string, opts: ProxyOpts = {}): Promise<NextRes
       method: opts.method || "GET",
       headers: {
         "X-API-Key": config.apiKey,
-        // Trusted campus scope derived from the signed session cookie.
-        // The browser never talks to the backend directly, so it cannot forge this.
+        // Trusted campus scope + role derived from the signed session cookie.
+        // The browser never talks to the backend directly, so it cannot forge these.
+        // X-Role drives salary confidentiality for interviewers.
         "X-Campus": session.campus,
+        "X-Role": session.role,
         ...(opts.body ? { "Content-Type": "application/json" } : {}),
       },
       body: opts.body ? JSON.stringify(opts.body) : undefined,

@@ -1,4 +1,4 @@
-import type { AppDetail, Employment } from "@/lib/types";
+import type { AppDetail, Employment, InterviewNote } from "@/lib/types";
 import { fmtDate, fmtDateTime, fullName, has } from "@/lib/format";
 import { STATUS_LABELS } from "@/lib/types";
 
@@ -63,7 +63,13 @@ const EMP_SECTIONS: Array<{ key: Employment["type"]; label: string }> = [
   { key: "prior", label: "Prior to Previous Employment" },
 ];
 
-export default function PrintView({ app }: { app: AppDetail }) {
+export default function PrintView({
+  app,
+  notes = [],
+}: {
+  app: AppDetail;
+  notes?: InterviewNote[];
+}) {
   const family = (app.family_members || []).filter((r) => has(r.name) || has(r.relationship) || has(r.occupation_place) || has(r.age));
   const education = (app.education || []).filter((r) => has(r.exam) || has(r.institution) || has(r.subjects));
   const trainings = (app.trainings || []).filter((r) => has(r.name) || has(r.institution));
@@ -74,21 +80,11 @@ export default function PrintView({ app }: { app: AppDetail }) {
   (app.employment || []).forEach((e) => { if (e.type) emp[e.type] = e; });
   const anyEmp = EMP_SECTIONS.some(({ key }) => emp[key as string]);
 
-  // Interview rounds (fall back to a synthesized single round for legacy records).
-  let rounds = app.interview_rounds || [];
-  if (!rounds.length && (has(app.interviewed_by) || has(app.date_of_interview) || has(app.interviewer_notes))) {
-    rounds = [{
-      round: 1,
-      interviewed_by: app.interviewed_by || "",
-      interviewed_on: app.date_of_interview || "",
-      interview_mode: app.interview_mode || "",
-      employment_type: app.employment_type || "",
-      designation_offered: app.designation_offered || "",
-      date_of_joining: app.date_of_joining || "",
-      notes: app.interviewer_notes || "",
-    }];
-  }
-  const lastInterviewDate = rounds.length ? rounds[rounds.length - 1].interviewed_on : app.date_of_interview;
+  // Interview notes come from their own table now; fall back to legacy JSONB.
+  const rounds: InterviewNote[] = notes.length ? notes : app.interview_rounds || [];
+  const lastInterviewDate = rounds.length
+    ? rounds[rounds.length - 1].interviewed_on
+    : app.date_of_interview;
 
   const social: Array<[string, string | null | undefined]> = [
     ["LinkedIn", app.linkedin_profile],
@@ -266,7 +262,10 @@ export default function PrintView({ app }: { app: AppDetail }) {
         {rounds.length ? (
           rounds.map((r, i) => (
             <div className="pv-emp" key={i}>
-              <h3 className="pv-h3">Round {r.round ?? i + 1}</h3>
+              <h3 className="pv-h3">
+                {has(r.interviewed_by) ? r.interviewed_by : `Round ${r.round_no ?? i + 1}`}
+                {r.round_no ? ` · Round ${r.round_no}` : ""}
+              </h3>
               <div className="pv-grid">
                 <Row label="Interviewed by" value={r.interviewed_by} />
                 <Row label="Interviewed on" value={fmtDate(r.interviewed_on)} />
@@ -274,6 +273,9 @@ export default function PrintView({ app }: { app: AppDetail }) {
                 <Row label="Employment type" value={r.employment_type} />
                 <Row label="Designation offered" value={r.designation_offered} />
                 <Row label="Date of joining" value={fmtDate(r.date_of_joining)} />
+                {has(r.recommended_salary) && (
+                  <Row label="Salary discussed (₹)" value={r.recommended_salary} />
+                )}
                 <Row label="Notes" value={r.notes} full />
               </div>
             </div>
