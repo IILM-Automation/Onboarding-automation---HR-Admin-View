@@ -63,13 +63,15 @@ export function passwordForScope(scope: Scope): string {
 
 /**
  * Interview-panel password for a campus — env `BTS_<CAMPUS>_INTERVIEWER_PASSWORD`,
- * dev fallback `bts_<campus>_interview_2024`. Deliberately distinct from the
+ * falling back to a single shared panel password. Deliberately distinct from the
  * campus HR password so interviewers never hold dashboard (salary) access.
  */
+const DEFAULT_INTERVIEWER_PASSWORD = "BTS@2026";
+
 export function interviewerPassword(campus: Campus): string {
   return (
     process.env[`BTS_${campus.toUpperCase()}_INTERVIEWER_PASSWORD`] ||
-    `bts_${campus.toLowerCase()}_interview_2024`
+    DEFAULT_INTERVIEWER_PASSWORD
   );
 }
 
