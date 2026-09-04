@@ -23,14 +23,19 @@ export default function Page() {
     );
   }
 
+  // Under the BTS Console (basePath set) sign-out returns to the console hub;
+  // standalone it behaves exactly as before (show this app's own login).
+  const onLogout = () =>
+    process.env.NEXT_PUBLIC_BASE_PATH ? (window.location.href = "/hub") : setSession(null);
+
   return (
     <ToastProvider>
       {session === null ? (
         <Login onSuccess={setSession} />
       ) : session.role === "interviewer" ? (
-        <InterviewerPanel session={session} onLogout={() => setSession(null)} />
+        <InterviewerPanel session={session} onLogout={onLogout} />
       ) : (
-        <Dashboard session={session} onLogout={() => setSession(null)} />
+        <Dashboard session={session} onLogout={onLogout} />
       )}
     </ToastProvider>
   );

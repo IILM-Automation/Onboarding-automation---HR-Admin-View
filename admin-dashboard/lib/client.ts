@@ -5,6 +5,11 @@
  */
 import type { AppDetail, AppListItem, InterviewNote, InterviewRound, Status } from "./types";
 
+// When stitched under a basePath (e.g. /onboarding) by the BTS Console, this
+// app's own /api routes live under that prefix. Prepend it to every call so the
+// browser hits THIS app, not the shell. Empty for standalone deploys.
+const BP = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 async function jsonOrThrow(res: Response) {
   let data: any = {};
   try {
@@ -30,7 +35,7 @@ export interface Session {
 
 export async function checkSession(): Promise<Session | null> {
   try {
-    const res = await fetch("/api/session", { cache: "no-store" });
+    const res = await fetch(BP + "/api/session", { cache: "no-store" });
     const data = await res.json();
     return data.authed ? { role: data.role as Role, campus: data.campus as string } : null;
   } catch {
@@ -45,7 +50,7 @@ export async function login(
   password: string,
   mode: LoginMode = "dashboard"
 ): Promise<boolean> {
-  const res = await fetch("/api/login", {
+  const res = await fetch(BP + "/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scope, password, mode }),
@@ -55,7 +60,7 @@ export async function login(
 
 /** All panelists' notes for a candidate. */
 export async function fetchNotes(appId: number): Promise<InterviewNote[]> {
-  const res = await fetch(`/api/applications/${appId}/notes`, { cache: "no-store" });
+  const res = await fetch(`${BP}/api/applications/${appId}/notes`, { cache: "no-store" });
   const data = await jsonOrThrow(res);
   return data.notes || [];
 }
@@ -65,7 +70,7 @@ export async function saveNote(
   appId: number,
   note: InterviewNote & { force_new?: boolean }
 ): Promise<{ id: number }> {
-  const res = await fetch(`/api/applications/${appId}/notes`, {
+  const res = await fetch(`${BP}/api/applications/${appId}/notes`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(note),
@@ -75,7 +80,7 @@ export async function saveNote(
 
 /** Delete one note (HR / super-admin only). */
 export async function deleteNote(appId: number, noteId: number): Promise<void> {
-  const res = await fetch(`/api/applications/${appId}/notes/${noteId}`, { method: "DELETE" });
+  const res = await fetch(`${BP}/api/applications/${appId}/notes/${noteId}`, { method: "DELETE" });
   await jsonOrThrow(res);
 }
 
@@ -87,7 +92,7 @@ export interface InviteResult {
 
 /** campus is required only for super-admin; campus users are scoped server-side. */
 export async function sendInvite(email: string, campus?: string): Promise<InviteResult> {
-  const res = await fetch("/api/invite", {
+  const res = await fetch(BP + "/api/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, ...(campus ? { campus } : {}) }),
@@ -96,7 +101,7 @@ export async function sendInvite(email: string, campus?: string): Promise<Invite
 }
 
 export async function logout(): Promise<void> {
-  await fetch("/api/logout", { method: "POST" });
+  await fetch(BP + "/api/logout", { method: "POST" });
 }
 
 export async function fetchApplications(params: {
@@ -114,7 +119,7 @@ export async function fetchApplications(params: {
   if (params.campus && params.campus !== "all") qs.set("campus", params.campus);
   if (params.dateFrom) qs.set("date_from", params.dateFrom);
   if (params.dateTo) qs.set("date_to", params.dateTo);
-  const res = await fetch("/api/applications" + (qs.toString() ? `?${qs}` : ""), {
+  const res = await fetch(BP + "/api/applications" + (qs.toString() ? `?${qs}` : ""), {
     cache: "no-store",
   });
   const data = await jsonOrThrow(res);
@@ -122,12 +127,12 @@ export async function fetchApplications(params: {
 }
 
 export async function fetchApplication(id: number): Promise<AppDetail> {
-  const res = await fetch(`/api/applications/${id}`, { cache: "no-store" });
+  const res = await fetch(`${BP}/api/applications/${id}`, { cache: "no-store" });
   return jsonOrThrow(res);
 }
 
 export async function updateStatus(id: number, status: Status): Promise<void> {
-  const res = await fetch(`/api/applications/${id}/status`, {
+  const res = await fetch(`${BP}/api/applications/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -137,7 +142,7 @@ export async function updateStatus(id: number, status: Status): Promise<void> {
 
 /** Super-admin only: reassign an application's campus. */
 export async function updateCampus(id: number, campus: string): Promise<void> {
-  const res = await fetch(`/api/applications/${id}/campus`, {
+  const res = await fetch(`${BP}/api/applications/${id}/campus`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ campus }),
@@ -162,7 +167,7 @@ export async function updateSalary(
   id: number,
   payload: SalaryPayload
 ): Promise<{ salary_updated_at?: string }> {
-  const res = await fetch(`/api/applications/${id}/salary`, {
+  const res = await fetch(`${BP}/api/applications/${id}/salary`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

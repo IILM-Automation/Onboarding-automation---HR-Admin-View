@@ -67,7 +67,7 @@ export default function Login({ onSuccess }: { onSuccess: (s: Session) => void }
     ) : (
       <div className="bts-logo-plate">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="bts-logo-img" src="/logos/bts.png" alt="Banyan Tree School" onError={() => setLogoFail(true)} />
+        <img className="bts-logo-img" src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logos/bts.png`} alt="Banyan Tree School" onError={() => setLogoFail(true)} />
       </div>
     );
 
