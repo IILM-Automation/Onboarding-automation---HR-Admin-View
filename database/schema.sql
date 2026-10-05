@@ -253,3 +253,27 @@ FROM bts_applications a,
      jsonb_array_elements(COALESCE(a.interview_rounds,'[]'::jsonb)) e
 WHERE COALESCE(trim(e->>'interviewed_by'),'') <> ''
   AND NOT EXISTS (SELECT 1 FROM bts_interview_notes);
+
+-- ============================================================
+-- PART 7: REPEAT-CANDIDATE DETECTION
+--
+-- When HR invites a candidate we look up the email against every prior
+-- invite and application. Deliberately NO lookup/cache table: that would
+-- be a second copy of data we already hold and would drift the first time
+-- a row changed outside the invite path. Two functional indexes give the
+-- same speed with no sync risk.
+--
+-- Email is already normalised to lower-case at the API boundary
+-- (backend/main.py), so lower() here matches what is actually stored.
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_applications_email_lower ON bts_applications (lower(email));
+CREATE INDEX IF NOT EXISTS idx_tokens_email_lower       ON bts_form_tokens  (lower(email));
+
+-- Audit trail for the override. When HR is warned that a candidate has
+-- applied before and chooses "Send anyway", the resulting token records
+-- that the warning was shown and acknowledged, and which prior
+-- application triggered it. NULL duplicate_of = no prior application row
+-- (the match was against an earlier invite that was never completed).
+ALTER TABLE bts_form_tokens
+    ADD COLUMN IF NOT EXISTS duplicate_ack BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS duplicate_of  INTEGER REFERENCES bts_applications(id);

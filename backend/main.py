@@ -16,6 +16,7 @@ Admin endpoints (require X-API-Key header, used by the HR dashboard):
     GET   /applications/{id}             — full application detail
     PATCH /applications/{id}/status      — update application status
     PATCH /applications/{id}/salary      — fill salary / CTC during interview
+    GET   /invites/precheck?email=       — has this candidate applied before?
 
 CORS is handled globally by the CORSMiddleware below, so these
 endpoints are reachable from the Vercel-hosted candidate portal and the
@@ -33,6 +34,7 @@ import psycopg2.errors
 import psycopg2.extras
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # Load credentials from backend/.env if present, so the app can be started
@@ -734,6 +736,150 @@ class InviteCreate(BaseModel):
     email: str
     position: Optional[str] = None
     campus: Optional[str] = None
+    # Set by the dashboard when HR has been shown the repeat-candidate
+    # warning and chose "Send anyway". Without it, a duplicate is refused
+    # with 409 so the confirmation step cannot be skipped by a stale or
+    # modified client. See _duplicate_lookup below.
+    duplicate_ack: Optional[bool] = False
+
+
+# ------------------------------------------------------------
+# Repeat-candidate detection.
+#
+# Matching is on the normalised email only — every write path lowercases
+# it, so lower(email) is a reliable key (and is indexed, see schema PART 7).
+#
+# CAMPUS ISOLATION: a campus-scoped caller must learn THAT someone applied
+# elsewhere without learning where, how it went, or being able to open the
+# record. Redaction therefore happens here, in the backend, before the data
+# is ever serialised — never in the UI. Super-admin (scope None) sees all.
+# ------------------------------------------------------------
+
+def _duplicate_lookup(cur, email: str, scope: Optional[str]) -> dict:
+    """Every prior application + invite for this email, campus-redacted.
+
+    Returns:
+      applications — one entry per prior application, newest first.
+      invites      — prior invites that never became an application,
+                     COLLAPSED per campus. HR legitimately re-sends links,
+                     so listing every token would bury the signal (one real
+                     address in this DB has 18 of them).
+      severity     — 'high' if a real application exists, 'low' if only
+                     invites, 'none' if the candidate is new.
+    """
+    cur.execute(
+        """
+        SELECT a.id, a.campus, a.created_at::date AS applied_on, a.status,
+               COALESCE(n.cnt, 0) AS rounds
+        FROM bts_applications a
+        LEFT JOIN (
+            SELECT application_id, COUNT(*) AS cnt
+            FROM bts_interview_notes
+            GROUP BY application_id
+        ) n ON n.application_id = a.id
+        WHERE lower(a.email) = %s
+        ORDER BY a.created_at DESC
+        LIMIT 20
+        """,
+        (email,),
+    )
+    app_rows = cur.fetchall()
+
+    cur.execute(
+        """
+        SELECT campus, created_at::date AS invited_on, status
+        FROM bts_form_tokens
+        WHERE lower(email) = %s AND application_id IS NULL
+        ORDER BY created_at DESC
+        """,
+        (email,),
+    )
+    token_rows = cur.fetchall()
+
+    def _own(campus: Optional[str]) -> bool:
+        return scope is None or campus == scope
+
+    applications = [
+        {
+            "redacted": not _own(r["campus"]),
+            "campus": r["campus"] if _own(r["campus"]) else None,
+            "applied_on": r["applied_on"].isoformat() if r["applied_on"] else None,
+            "status": r["status"] if _own(r["campus"]) else None,
+            "rounds": int(r["rounds"] or 0),
+            "application_id": r["id"] if _own(r["campus"]) else None,
+        }
+        for r in app_rows
+    ]
+
+    # Visible campuses keep their own bucket; everything behind the campus
+    # wall merges into ONE anonymous bucket, so the caller cannot even count
+    # how many other campuses are involved.
+    own_buckets: dict = {}
+    other = {"redacted": True, "campus": None, "count": 0, "last_on": None, "has_pending": False}
+
+    for r in token_rows:
+        if _own(r["campus"]):
+            bucket = own_buckets.setdefault(
+                r["campus"] or "",
+                {"redacted": False, "campus": r["campus"], "count": 0,
+                 "last_on": None, "has_pending": False},
+            )
+        else:
+            bucket = other
+        bucket["count"] += 1
+        # 'pending' = the link is still live, i.e. this is a resend rather
+        # than a lapsed invite. The UI words those two very differently.
+        if r["status"] not in ("submitted", "expired"):
+            bucket["has_pending"] = True
+        on = r["invited_on"].isoformat() if r["invited_on"] else None
+        if on and (bucket["last_on"] is None or on > bucket["last_on"]):
+            bucket["last_on"] = on
+
+    invites = list(own_buckets.values()) + ([other] if other["count"] else [])
+
+    return {
+        "duplicate": bool(applications or invites),
+        "email": email,
+        "severity": "high" if applications else ("low" if invites else "none"),
+        "applications": applications,
+        "invites": invites,
+    }
+
+
+_EMPTY_LOOKUP = {
+    "duplicate": False,
+    "severity": "none",
+    "applications": [],
+    "invites": [],
+}
+
+
+@app.get("/invites/precheck")
+def precheck_invite(
+    email: str = "",
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+):
+    """Has this candidate been here before? Called as HR leaves the email field.
+
+    Advisory only — it exists to warn HR early. The authoritative check runs
+    inside POST /invites, so a failed or skipped precheck can never let a
+    duplicate through unnoticed.
+    """
+    require_api_key(x_api_key)
+    _require_not_interviewer(x_role, "invite candidates")
+
+    normalized = (email or "").strip().lower()
+    if not EMAIL_RE.match(normalized):
+        return {**_EMPTY_LOOKUP, "email": normalized}
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            return _duplicate_lookup(cur, normalized, _campus_scope(x_campus))
+    finally:
+        conn.close()
 
 
 def _fire_invite_webhook(payload: dict) -> bool:
@@ -795,9 +941,47 @@ def create_invite(
             detail="Invite workflow is not configured (set N8N_INVITE_WEBHOOK_URL).",
         )
 
+    # Repeat-candidate gate. Refuse an un-acknowledged duplicate with 409 so
+    # the confirmation genuinely happens server-side; the dashboard retries
+    # with duplicate_ack once HR has chosen "Send anyway".
+    #
+    # duplicate_of is resolved HERE rather than accepted from the client:
+    # the browser may have had the prior application redacted from it, and
+    # an audit trail the caller can set is not an audit trail.
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            dup = _duplicate_lookup(cur, email, scope)
+            cur.execute(
+                "SELECT id FROM bts_applications WHERE lower(email) = %s "
+                "ORDER BY created_at DESC LIMIT 1",
+                (email,),
+            )
+            prior = cur.fetchone()
+            duplicate_of = prior["id"] if prior else None
+    finally:
+        conn.close()
+
+    if dup["duplicate"] and not body.duplicate_ack:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "This candidate has been invited or has applied before.",
+                **dup,
+            },
+        )
+
     try:
         triggered = _fire_invite_webhook(
-            {"email": email, "org": "BTS", "position": position, "campus": campus}
+            {
+                "email": email,
+                "org": "BTS",
+                "position": position,
+                "campus": campus,
+                # Stamped onto the new token row by the n8n invite workflow.
+                "duplicate_ack": bool(dup["duplicate"] and body.duplicate_ack),
+                "duplicate_of": duplicate_of if dup["duplicate"] else None,
+            }
         )
     except Exception as exc:  # noqa: BLE001 — surface a clean message to HR
         raise HTTPException(

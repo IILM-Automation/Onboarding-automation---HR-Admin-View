@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchApplications, logout, sendInvite, type Session } from "@/lib/client";
+import {
+  DuplicateInviteError,
+  fetchApplications,
+  logout,
+  precheckInvite,
+  sendInvite,
+  type DuplicateCheck,
+  type Session,
+} from "@/lib/client";
 import type { AppListItem, Status } from "@/lib/types";
 import { useToast } from "./Toast";
 import AppList from "./AppList";
 import AppDetail from "./AppDetail";
+import DuplicateDialog, { DuplicateHint } from "./DuplicateDialog";
 
 const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
 
@@ -146,19 +155,36 @@ function InviteModal({
   const [email, setEmail] = useState("");
   const [campus, setCampus] = useState(isAdmin ? "" : sessionCampus);
   const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState<DuplicateCheck | null>(null);
+  const [confirming, setConfirming] = useState<DuplicateCheck | null>(null);
 
-  async function submit() {
+  /** Early warning only. The real gate is the 409 from submit(). */
+  async function checkEmail() {
+    const value = email.trim();
+    if (!value) return setHint(null);
+    const result = await precheckInvite(value);
+    setHint(result.duplicate ? result : null);
+  }
+
+  async function submit(duplicateAck = false) {
     if (busy) return;
     if (!email.trim()) return toast("Please enter a candidate email.", "error");
     if (isAdmin && !campus) return toast("Please choose a campus for this invite.", "error");
     setBusy(true);
     try {
-      const res = await sendInvite(email.trim(), isAdmin ? campus : undefined);
+      const res = await sendInvite(email.trim(), isAdmin ? campus : undefined, { duplicateAck });
       toast(`Invite sent to ${res.email} (${res.campus || sessionCampus})`, "success");
       setEmail("");
+      setHint(null);
+      setConfirming(null);
       onSent();
       onClose();
     } catch (e) {
+      if (e instanceof DuplicateInviteError) {
+        setHint(e.check);
+        setConfirming(e.check);
+        return;
+      }
       toast((e as Error).message || "Failed to create invite", "error");
     } finally {
       setBusy(false);
@@ -166,6 +192,7 @@ function InviteModal({
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="section-title">Invite a candidate</div>
@@ -179,9 +206,14 @@ function InviteModal({
             value={email}
             autoFocus
             placeholder="candidate@example.com"
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setHint(null); // stale the moment the address changes
+            }}
+            onBlur={checkEmail}
             onKeyDown={(e) => e.key === "Enter" && submit()}
           />
+          {hint && <DuplicateHint check={hint} />}
         </div>
         {isAdmin && (
           <div className="salary-field" style={{ marginBottom: 12 }}>
@@ -196,11 +228,25 @@ function InviteModal({
         )}
         <div className="modal-foot">
           <button className="btn-outline" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn-accent" onClick={submit} disabled={busy}>
+          <button className="btn-accent" onClick={() => submit()} disabled={busy}>
             {busy ? "Sending…" : "Send Invite"}
           </button>
         </div>
       </div>
     </div>
+
+    {/* Sibling, not a child: nested inside the overlay above, a click on the
+        confirm dialog's own backdrop would bubble up and close the invite
+        modal underneath it. */}
+    {confirming && (
+      <DuplicateDialog
+        check={confirming}
+        email={email.trim()}
+        busy={busy}
+        onSendAnyway={() => submit(true)}
+        onGoBack={() => setConfirming(null)}
+      />
+    )}
+    </>
   );
 }

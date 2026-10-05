@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { logout, sendInvite, type InviteResult } from "@/lib/client";
+import {
+  DuplicateInviteError,
+  logout,
+  precheckInvite,
+  sendInvite,
+  type DuplicateCheck,
+  type InviteResult,
+} from "@/lib/client";
+import DuplicateDialog, { DuplicateHint } from "./DuplicateDialog";
 import { useToast } from "./Toast";
 
 // Must comfortably cover the backend webhook window so a second invite
@@ -19,6 +27,9 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
   const [busy, setBusy] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sent, setSent] = useState<SentItem[]>([]);
+  // Early (on-blur) warning, and the blocking confirm raised by the 409.
+  const [hint, setHint] = useState<DuplicateCheck | null>(null);
+  const [confirming, setConfirming] = useState<DuplicateCheck | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -42,7 +53,21 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
     }, 1000);
   }
 
-  async function submit() {
+  function releaseLock() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCountdown(0);
+    setBusy(false);
+  }
+
+  /** Early warning only. The real gate is the 409 from submit(). */
+  async function checkEmail() {
+    const value = email.trim();
+    if (!value) return setHint(null);
+    const result = await precheckInvite(value);
+    setHint(result.duplicate ? result : null);
+  }
+
+  async function submit(duplicateAck = false) {
     if (busy) return;
     const value = email.trim();
     if (!value) {
@@ -53,16 +78,22 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
     setBusy(true);
     startLock();
     try {
-      const res: InviteResult = await sendInvite(value);
+      const res: InviteResult = await sendInvite(value, undefined, { duplicateAck });
       const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setSent((prev) => [{ email: res.email, at }, ...prev]);
       setEmail("");
+      setHint(null);
+      setConfirming(null);
       toast(`Invite sent to ${res.email}`, "success");
     } catch (e) {
-      // On failure, release the lock right away so HR can retry/fix.
-      if (timerRef.current) clearInterval(timerRef.current);
-      setCountdown(0);
-      setBusy(false);
+      // Release the lock first: whether HR is fixing a typo or confirming a
+      // repeat candidate, they need the button back immediately.
+      releaseLock();
+      if (e instanceof DuplicateInviteError) {
+        setHint(e.check);
+        setConfirming(e.check);
+        return;
+      }
       toast((e as Error).message || "Failed to create invite", "error");
     }
   }
@@ -107,15 +138,20 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
               value={email}
               autoFocus
               disabled={busy}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setHint(null); // stale the moment the address changes
+              }}
+              onBlur={checkEmail}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submit();
               }}
             />
-            <button className="hr-submit" onClick={submit} disabled={busy}>
+            <button className="hr-submit" onClick={() => submit()} disabled={busy}>
               {busy ? (countdown > 0 ? `Please wait ${countdown}s` : "Sending…") : "Send Invite"}
             </button>
           </div>
+          {hint && <DuplicateHint check={hint} />}
           <p className="hr-hint">
             The button stays locked for {LOCK_SECONDS}s after each send so invites can&apos;t collide.
           </p>
@@ -137,6 +173,16 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
           </section>
         )}
       </main>
+
+      {confirming && (
+        <DuplicateDialog
+          check={confirming}
+          email={email.trim()}
+          busy={busy}
+          onSendAnyway={() => submit(true)}
+          onGoBack={() => setConfirming(null)}
+        />
+      )}
     </div>
   );
 }

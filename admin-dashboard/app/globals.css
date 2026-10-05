@@ -617,6 +617,69 @@ table.data tr:last-child td{border-bottom:none;}
 }
 .btn-outline:hover{ border-color:var(--muted); }
 
+/* ------------------------------------------------------------------
+   Repeat-candidate warning (DuplicateDialog)
+   Sits above .modal-overlay (z-index 400) so it can be raised from the
+   admin dashboard's own invite modal without being buried behind it.
+   ------------------------------------------------------------------ */
+.dup-overlay{ z-index:420; }
+.dup-card{ max-width:520px; }
+
+.dup-banner{
+  display:flex; gap:12px; align-items:flex-start;
+  padding:14px 16px; border-radius:12px; margin-bottom:16px;
+}
+.dup-banner.dup-high{ background:#FEF2F2; border:1px solid #FECACA; }
+.dup-banner.dup-low { background:#FFFBEB; border:1px solid #FDE68A; }
+.dup-icon{
+  flex-shrink:0; width:24px; height:24px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:14px; color:#fff; line-height:1;
+}
+.dup-high .dup-icon{ background:#DC2626; }
+.dup-low  .dup-icon{ background:var(--accent); }
+.dup-high .section-title{ color:#991B1B; }
+.dup-low  .section-title{ color:#92400E; }
+.dup-email{
+  font-size:13px; color:var(--muted); margin-top:3px;
+  word-break:break-all;
+}
+
+.dup-list{ list-style:none; margin:0 0 4px; padding:0; display:flex; flex-direction:column; gap:9px; }
+.dup-row{
+  display:flex; gap:10px; align-items:flex-start;
+  font-size:13.5px; line-height:1.5; color:var(--text, #111827);
+}
+.dup-dot{
+  flex-shrink:0; width:7px; height:7px; border-radius:50%;
+  background:#DC2626; margin-top:7px;
+}
+/* Prior invites are routine — HR re-sends links all the time. Mute them so
+   a genuine previous application keeps the eye. */
+.dup-row-soft{ color:var(--muted); font-size:13px; }
+.dup-row-soft .dup-dot{ background:var(--muted); }
+.dup-redacted{ font-style:italic; }
+
+.dup-note{
+  font-size:11.5px; color:var(--muted); margin:14px 0 0;
+  padding-top:10px; border-top:1px dashed var(--border);
+}
+.dup-send{ background:#DC2626; }
+
+/* Inline on-blur hint under the email field */
+.dup-hint{
+  font-size:12.5px; font-weight:600; margin:10px 0 0;
+  padding:8px 11px; border-radius:8px; line-height:1.45;
+}
+.dup-hint.dup-high{ background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; }
+.dup-hint.dup-low { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
+
+@media (max-width:520px){
+  .dup-card{ max-width:100%; }
+  .dup-card .modal-foot{ flex-direction:column-reverse; }
+  .dup-card .modal-foot button{ width:100%; }
+}
+
 /* campus in print header */
 @media print{ .pv-org{ } }
 

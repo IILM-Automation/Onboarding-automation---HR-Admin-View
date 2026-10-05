@@ -85,13 +85,96 @@ export interface InviteResult {
   campus?: string;
 }
 
-/** campus is required only for super-admin; campus users are scoped server-side. */
-export async function sendInvite(email: string, campus?: string): Promise<InviteResult> {
+/* ---------------- Repeat-candidate detection ---------------- */
+
+/** A prior application. Fields are null when the record belongs to another
+ *  campus — the backend strips them before sending, so "redacted" here is a
+ *  statement of fact, not a rendering hint. */
+export interface PriorApplication {
+  redacted: boolean;
+  campus: string | null;
+  applied_on: string | null;
+  status: string | null;
+  rounds: number;
+  application_id: number | null;
+}
+
+/** Prior invites that never became an application, collapsed per campus.
+ *  HR re-sends links routinely, so these arrive as a count, not a list. */
+export interface PriorInvites {
+  redacted: boolean;
+  campus: string | null;
+  count: number;
+  last_on: string | null;
+  /** A link is still live — this is a resend, not a lapsed invite. */
+  has_pending: boolean;
+}
+
+export interface DuplicateCheck {
+  duplicate: boolean;
+  email?: string;
+  /** high = a real prior application, low = invites only, none = new. */
+  severity: "high" | "low" | "none";
+  applications: PriorApplication[];
+  invites: PriorInvites[];
+}
+
+const NO_DUPLICATE: DuplicateCheck = {
+  duplicate: false,
+  severity: "none",
+  applications: [],
+  invites: [],
+};
+
+/** Thrown when the backend refuses an un-acknowledged duplicate (HTTP 409). */
+export class DuplicateInviteError extends Error {
+  check: DuplicateCheck;
+  constructor(check: DuplicateCheck) {
+    super("This candidate has been invited or has applied before.");
+    this.name = "DuplicateInviteError";
+    this.check = check;
+  }
+}
+
+/**
+ * Early warning as HR leaves the email field. Deliberately fails OPEN: a
+ * precheck that errors must never stop HR inviting someone, because the
+ * authoritative duplicate gate lives in POST /invites and will still fire.
+ */
+export async function precheckInvite(email: string): Promise<DuplicateCheck> {
+  try {
+    const res = await fetch(`/api/invite/precheck?email=${encodeURIComponent(email)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return NO_DUPLICATE;
+    return (await res.json()) as DuplicateCheck;
+  } catch {
+    return NO_DUPLICATE;
+  }
+}
+
+/** campus is required only for super-admin; campus users are scoped server-side.
+ *  Throws DuplicateInviteError when the candidate has been seen before and
+ *  duplicateAck has not been given. */
+export async function sendInvite(
+  email: string,
+  campus?: string,
+  opts: { duplicateAck?: boolean } = {}
+): Promise<InviteResult> {
   const res = await fetch("/api/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, ...(campus ? { campus } : {}) }),
+    body: JSON.stringify({
+      email,
+      ...(campus ? { campus } : {}),
+      ...(opts.duplicateAck ? { duplicate_ack: true } : {}),
+    }),
   });
+
+  if (res.status === 409) {
+    const data = await res.json().catch(() => null);
+    if (data?.duplicate) throw new DuplicateInviteError(data as DuplicateCheck);
+  }
   return jsonOrThrow(res);
 }
 
