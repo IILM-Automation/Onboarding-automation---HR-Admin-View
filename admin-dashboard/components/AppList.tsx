@@ -2,7 +2,7 @@
 
 import type { AppListItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/types";
-import { fullName, relativeDate, statusVar, has } from "@/lib/format";
+import { fmtDate, fullName, relativeDate, statusVar, has } from "@/lib/format";
 
 const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
 
@@ -110,7 +110,21 @@ export default function AppList(p: Props) {
               onClick={() => p.onSelect(a.id)}
             >
               <span className="card-main">
-                <span className="card-name">{fullName(a)}</span>
+                <span className="card-name">
+                  {(a.prior_count ?? 0) > 0 && (
+                    <span
+                      className="repeat-dot"
+                      title={
+                        `Repeat candidate — applied before` +
+                        (a.prior_on ? ` on ${fmtDate(a.prior_on)}` : "") +
+                        (a.created_at ? `, this application ${fmtDate(a.created_at)}` : "") +
+                        ((a.prior_count ?? 0) > 1 ? ` (${a.prior_count} earlier applications)` : "")
+                      }
+                      aria-label="Repeat candidate"
+                    />
+                  )}
+                  {fullName(a)}
+                </span>
                 <span className="card-pos">{has(a.position_applied_for) ? a.position_applied_for : "—"}</span>
                 <span className="card-badges">
                   {a.org && <span className={`org-badge ${a.org}`}>{a.org}</span>}

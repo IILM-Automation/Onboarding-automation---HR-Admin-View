@@ -14,7 +14,7 @@ import type { AppListItem, Status } from "@/lib/types";
 import { useToast } from "./Toast";
 import AppList from "./AppList";
 import AppDetail from "./AppDetail";
-import DuplicateDialog, { DuplicateHint } from "./DuplicateDialog";
+import DuplicateHistory, { DuplicateClear } from "./DuplicateHistory";
 
 const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
 
@@ -155,34 +155,59 @@ function InviteModal({
   const [email, setEmail] = useState("");
   const [campus, setCampus] = useState(isAdmin ? "" : sessionCampus);
   const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState<DuplicateCheck | null>(null);
-  const [confirming, setConfirming] = useState<DuplicateCheck | null>(null);
 
-  /** Early warning only. The real gate is the 409 from submit(). */
-  async function checkEmail() {
+  // The history lookup gates the send. "idle" = not yet checked for the
+  // address currently in the box, so Send stays locked; any other state
+  // means HR has seen the answer and may proceed.
+  const [state, setState] = useState<"idle" | "checking" | "clear" | "found">("idle");
+  const [check, setCheck] = useState<DuplicateCheck | null>(null);
+  // Which address the current result belongs to, so editing the email
+  // re-locks the button instead of showing a stale verdict.
+  const checkedFor = useRef("");
+
+  async function runCheck() {
     const value = email.trim();
-    if (!value) return setHint(null);
+    if (!value) {
+      setState("idle");
+      setCheck(null);
+      return;
+    }
+    if (state === "checking") return;
+    setState("checking");
     const result = await precheckInvite(value);
-    setHint(result.duplicate ? result : null);
+    checkedFor.current = value;
+    setCheck(result.duplicate ? result : null);
+    setState(result.duplicate ? "found" : "clear");
   }
 
-  async function submit(duplicateAck = false) {
+  const checked = state === "clear" || state === "found";
+
+  async function submit() {
     if (busy) return;
     if (!email.trim()) return toast("Please enter a candidate email.", "error");
     if (isAdmin && !campus) return toast("Please choose a campus for this invite.", "error");
+    if (!checked) return runCheck(); // never send un-checked
     setBusy(true);
     try {
-      const res = await sendInvite(email.trim(), isAdmin ? campus : undefined, { duplicateAck });
+      // HR has seen the history inline, so the acknowledgement is implicit.
+      // The backend's 409 remains as a backstop for anything that slips past.
+      const res = await sendInvite(email.trim(), isAdmin ? campus : undefined, {
+        duplicateAck: state === "found",
+      });
       toast(`Invite sent to ${res.email} (${res.campus || sessionCampus})`, "success");
       setEmail("");
-      setHint(null);
-      setConfirming(null);
+      setCheck(null);
+      setState("idle");
       onSent();
       onClose();
     } catch (e) {
+      // Backstop: the address changed between the check and the send, or the
+      // precheck failed open. Show the history rather than a bare error.
       if (e instanceof DuplicateInviteError) {
-        setHint(e.check);
-        setConfirming(e.check);
+        setCheck(e.check);
+        setState("found");
+        checkedFor.current = email.trim();
+        toast("This candidate has applied before — review below.", "error");
         return;
       }
       toast((e as Error).message || "Failed to create invite", "error");
@@ -192,28 +217,43 @@ function InviteModal({
   }
 
   return (
-    <>
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card invite-card" onClick={(e) => e.stopPropagation()}>
         <div className="section-title">Invite a candidate</div>
         <p className="modal-sub">
           {isAdmin ? "Choose the campus this candidate is applying to." : `Campus: ${sessionCampus}`}
         </p>
         <div className="salary-field" style={{ marginBottom: 12 }}>
           <label>Candidate email</label>
-          <input
-            type="email"
-            value={email}
-            autoFocus
-            placeholder="candidate@example.com"
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setHint(null); // stale the moment the address changes
-            }}
-            onBlur={checkEmail}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-          />
-          {hint && <DuplicateHint check={hint} />}
+          <div className="invite-emailrow">
+            <input
+              type="email"
+              value={email}
+              autoFocus
+              placeholder="candidate@example.com"
+              onChange={(e) => {
+                const next = e.target.value;
+                setEmail(next);
+                // Re-lock as soon as the address differs from what we checked.
+                if (next.trim() !== checkedFor.current) {
+                  setState("idle");
+                  setCheck(null);
+                }
+              }}
+              onBlur={runCheck}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+            <button
+              type="button"
+              className="btn-outline invite-check"
+              onClick={runCheck}
+              disabled={state === "checking" || !email.trim() || busy}
+            >
+              {state === "checking" ? "Checking…" : "Check"}
+            </button>
+          </div>
+          {state === "clear" && <DuplicateClear />}
+          {state === "found" && check && <DuplicateHistory check={check} />}
         </div>
         {isAdmin && (
           <div className="salary-field" style={{ marginBottom: 12 }}>
@@ -227,26 +267,20 @@ function InviteModal({
           </div>
         )}
         <div className="modal-foot">
+          {!checked && (
+            <span className="invite-gate-note">Check the candidate first</span>
+          )}
           <button className="btn-outline" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn-accent" onClick={() => submit()} disabled={busy}>
-            {busy ? "Sending…" : "Send Invite"}
+          <button
+            className={`btn-accent${state === "found" ? " btn-danger" : ""}`}
+            onClick={() => submit()}
+            disabled={busy || !checked}
+            title={checked ? undefined : "Run the duplicate check before sending"}
+          >
+            {busy ? "Sending…" : state === "found" ? "Send anyway" : "Send Invite"}
           </button>
         </div>
       </div>
     </div>
-
-    {/* Sibling, not a child: nested inside the overlay above, a click on the
-        confirm dialog's own backdrop would bubble up and close the invite
-        modal underneath it. */}
-    {confirming && (
-      <DuplicateDialog
-        check={confirming}
-        email={email.trim()}
-        busy={busy}
-        onSendAnyway={() => submit(true)}
-        onGoBack={() => setConfirming(null)}
-      />
-    )}
-    </>
   );
 }

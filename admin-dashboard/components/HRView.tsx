@@ -9,7 +9,7 @@ import {
   type DuplicateCheck,
   type InviteResult,
 } from "@/lib/client";
-import DuplicateDialog, { DuplicateHint } from "./DuplicateDialog";
+import DuplicateHistory, { DuplicateClear } from "./DuplicateHistory";
 import { useToast } from "./Toast";
 
 // Must comfortably cover the backend webhook window so a second invite
@@ -27,9 +27,11 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
   const [busy, setBusy] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sent, setSent] = useState<SentItem[]>([]);
-  // Early (on-blur) warning, and the blocking confirm raised by the 409.
-  const [hint, setHint] = useState<DuplicateCheck | null>(null);
-  const [confirming, setConfirming] = useState<DuplicateCheck | null>(null);
+  // The history lookup gates the send; "idle" means the address in the box
+  // has not been checked yet, so Send stays locked.
+  const [state, setState] = useState<"idle" | "checking" | "clear" | "found">("idle");
+  const [check, setCheck] = useState<DuplicateCheck | null>(null);
+  const checkedFor = useRef("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -59,39 +61,54 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
     setBusy(false);
   }
 
-  /** Early warning only. The real gate is the 409 from submit(). */
-  async function checkEmail() {
+  async function runCheck() {
     const value = email.trim();
-    if (!value) return setHint(null);
+    if (!value) {
+      setState("idle");
+      setCheck(null);
+      return;
+    }
+    if (state === "checking") return;
+    setState("checking");
     const result = await precheckInvite(value);
-    setHint(result.duplicate ? result : null);
+    checkedFor.current = value;
+    setCheck(result.duplicate ? result : null);
+    setState(result.duplicate ? "found" : "clear");
   }
 
-  async function submit(duplicateAck = false) {
+  const checked = state === "clear" || state === "found";
+
+  async function submit() {
     if (busy) return;
     const value = email.trim();
     if (!value) {
       toast("Please enter a candidate email address.", "error");
       return;
     }
+    if (!checked) return runCheck(); // never send un-checked
     // Lock immediately — guards against double-clicks racing the request.
     setBusy(true);
     startLock();
     try {
-      const res: InviteResult = await sendInvite(value, undefined, { duplicateAck });
+      // HR has seen the history inline, so the acknowledgement is implicit.
+      const res: InviteResult = await sendInvite(value, undefined, {
+        duplicateAck: state === "found",
+      });
       const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setSent((prev) => [{ email: res.email, at }, ...prev]);
       setEmail("");
-      setHint(null);
-      setConfirming(null);
+      setCheck(null);
+      setState("idle");
       toast(`Invite sent to ${res.email}`, "success");
     } catch (e) {
-      // Release the lock first: whether HR is fixing a typo or confirming a
+      // Release the lock first: whether HR is fixing a typo or reviewing a
       // repeat candidate, they need the button back immediately.
       releaseLock();
       if (e instanceof DuplicateInviteError) {
-        setHint(e.check);
-        setConfirming(e.check);
+        setCheck(e.check);
+        setState("found");
+        checkedFor.current = value;
+        toast("This candidate has applied before — review below.", "error");
         return;
       }
       toast((e as Error).message || "Failed to create invite", "error");
@@ -139,19 +156,44 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
               autoFocus
               disabled={busy}
               onChange={(e) => {
-                setEmail(e.target.value);
-                setHint(null); // stale the moment the address changes
+                const next = e.target.value;
+                setEmail(next);
+                // Re-lock as soon as the address differs from what we checked.
+                if (next.trim() !== checkedFor.current) {
+                  setState("idle");
+                  setCheck(null);
+                }
               }}
-              onBlur={checkEmail}
+              onBlur={runCheck}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submit();
               }}
             />
-            <button className="hr-submit" onClick={() => submit()} disabled={busy}>
-              {busy ? (countdown > 0 ? `Please wait ${countdown}s` : "Sending…") : "Send Invite"}
+            <button
+              type="button"
+              className="btn-outline invite-check"
+              onClick={runCheck}
+              disabled={state === "checking" || !email.trim() || busy}
+            >
+              {state === "checking" ? "Checking…" : "Check"}
+            </button>
+            <button
+              className="hr-submit"
+              onClick={() => submit()}
+              disabled={busy || !checked}
+              title={checked ? undefined : "Run the duplicate check before sending"}
+            >
+              {busy
+                ? countdown > 0
+                  ? `Please wait ${countdown}s`
+                  : "Sending…"
+                : state === "found"
+                  ? "Send anyway"
+                  : "Send Invite"}
             </button>
           </div>
-          {hint && <DuplicateHint check={hint} />}
+          {state === "clear" && <DuplicateClear />}
+          {state === "found" && check && <DuplicateHistory check={check} />}
           <p className="hr-hint">
             The button stays locked for {LOCK_SECONDS}s after each send so invites can&apos;t collide.
           </p>
@@ -174,15 +216,6 @@ export default function HRView({ onLogout }: { onLogout: () => void }) {
         )}
       </main>
 
-      {confirming && (
-        <DuplicateDialog
-          check={confirming}
-          email={email.trim()}
-          busy={busy}
-          onSendAnyway={() => submit(true)}
-          onGoBack={() => setConfirming(null)}
-        />
-      )}
     </div>
   );
 }

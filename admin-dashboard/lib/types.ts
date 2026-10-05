@@ -25,6 +25,11 @@ export interface AppListItem {
   surname?: string | null;
   has_photo?: boolean;
   created_at?: string | null;
+  /** Number of EARLIER applications from this email, across all campuses.
+   *  >0 marks a repeat candidate in the list. */
+  prior_count?: number | null;
+  /** Date of the most recent earlier application, for the repeat marker. */
+  prior_on?: string | null;
 }
 
 export interface FamilyMember {

@@ -618,66 +618,79 @@ table.data tr:last-child td{border-bottom:none;}
 .btn-outline:hover{ border-color:var(--muted); }
 
 /* ------------------------------------------------------------------
-   Repeat-candidate warning (DuplicateDialog)
-   Sits above .modal-overlay (z-index 400) so it can be raised from the
-   admin dashboard's own invite modal without being buried behind it.
+   Repeat-candidate history — rendered INLINE in the invite modal.
+   Deliberately not a stacked second modal: one surface, and Send Invite
+   stays reachable while HR reads the history.
    ------------------------------------------------------------------ */
-.dup-overlay{ z-index:420; }
-.dup-card{ max-width:520px; }
-
-.dup-banner{
-  display:flex; gap:12px; align-items:flex-start;
-  padding:14px 16px; border-radius:12px; margin-bottom:16px;
+.invite-card{ max-width:480px; }
+.invite-emailrow{ display:flex; gap:8px; align-items:stretch; }
+.invite-emailrow input{ flex:1; min-width:0; }
+.invite-check{ flex-shrink:0; padding:9px 14px; cursor:pointer; white-space:nowrap; }
+.invite-check:disabled{ opacity:.5; cursor:default; }
+.invite-gate-note{
+  margin-right:auto; align-self:center;
+  font-size:11.5px; color:var(--muted); font-style:italic;
 }
-.dup-banner.dup-high{ background:#FEF2F2; border:1px solid #FECACA; }
-.dup-banner.dup-low { background:#FFFBEB; border:1px solid #FDE68A; }
+
+.dup-panel{
+  margin-top:10px; padding:12px 14px; border-radius:10px;
+  animation:dup-in .18s ease-out;
+}
+@keyframes dup-in{ from{ opacity:0; transform:translateY(-3px); } to{ opacity:1; transform:none; } }
+.dup-panel.dup-high{ background:#FEF2F2; border:1px solid #FECACA; }
+.dup-panel.dup-low { background:#FFFBEB; border:1px solid #FDE68A; }
+.dup-panel.dup-clear{
+  background:#F0FDF4; border:1px solid #BBF7D0; color:#166534;
+  display:flex; align-items:center; gap:9px; font-size:13px; font-weight:600;
+}
+
+.dup-head{ display:flex; gap:9px; align-items:center; margin-bottom:10px; }
 .dup-icon{
-  flex-shrink:0; width:24px; height:24px; border-radius:50%;
+  flex-shrink:0; width:20px; height:20px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font-weight:800; font-size:14px; color:#fff; line-height:1;
+  font-weight:800; font-size:12px; color:#fff; line-height:1;
 }
 .dup-high .dup-icon{ background:#DC2626; }
 .dup-low  .dup-icon{ background:var(--accent); }
-.dup-high .section-title{ color:#991B1B; }
-.dup-low  .section-title{ color:#92400E; }
-.dup-email{
-  font-size:13px; color:var(--muted); margin-top:3px;
-  word-break:break-all;
-}
+.dup-icon-ok{ background:#16A34A; }
+.dup-title{ font-size:13px; font-weight:700; letter-spacing:.2px; }
+.dup-high .dup-title{ color:#991B1B; }
+.dup-low  .dup-title{ color:#92400E; }
 
-.dup-list{ list-style:none; margin:0 0 4px; padding:0; display:flex; flex-direction:column; gap:9px; }
+.dup-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
 .dup-row{
-  display:flex; gap:10px; align-items:flex-start;
-  font-size:13.5px; line-height:1.5; color:var(--text, #111827);
+  display:flex; gap:9px; align-items:flex-start;
+  font-size:12.5px; line-height:1.45; color:#1F2937;
 }
 .dup-dot{
-  flex-shrink:0; width:7px; height:7px; border-radius:50%;
-  background:#DC2626; margin-top:7px;
+  flex-shrink:0; width:6px; height:6px; border-radius:50%;
+  background:#DC2626; margin-top:6px;
 }
 /* Prior invites are routine — HR re-sends links all the time. Mute them so
    a genuine previous application keeps the eye. */
-.dup-row-soft{ color:var(--muted); font-size:13px; }
+.dup-row-soft{ color:var(--muted); font-size:12px; }
 .dup-row-soft .dup-dot{ background:var(--muted); }
 .dup-redacted{ font-style:italic; }
 
 .dup-note{
-  font-size:11.5px; color:var(--muted); margin:14px 0 0;
-  padding-top:10px; border-top:1px dashed var(--border);
+  font-size:11px; color:var(--muted); margin:11px 0 0;
+  padding-top:9px; border-top:1px dashed rgba(0,0,0,.12);
 }
-.dup-send{ background:#DC2626; }
 
-/* Inline on-blur hint under the email field */
-.dup-hint{
-  font-size:12.5px; font-weight:600; margin:10px 0 0;
-  padding:8px 11px; border-radius:8px; line-height:1.45;
+/* Send turns red once HR is knowingly inviting a repeat candidate. */
+.btn-accent.btn-danger{ background:#DC2626; }
+
+/* Repeat-candidate dot on the candidate list rows */
+.repeat-dot{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:#DC2626; margin-right:7px; vertical-align:middle;
+  flex-shrink:0;
 }
-.dup-hint.dup-high{ background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; }
-.dup-hint.dup-low { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
 
 @media (max-width:520px){
-  .dup-card{ max-width:100%; }
-  .dup-card .modal-foot{ flex-direction:column-reverse; }
-  .dup-card .modal-foot button{ width:100%; }
+  .invite-card{ max-width:100%; }
+  .invite-emailrow{ flex-direction:column; }
+  .invite-check{ width:100%; }
 }
 
 /* campus in print header */

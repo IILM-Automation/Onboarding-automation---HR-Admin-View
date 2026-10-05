@@ -191,10 +191,27 @@ def open_token(token: str):
 
 # Columns returned in the list view — kept lean (no JSONB blobs, no photo).
 _LIST_COLUMNS = """
-    id, email, position_applied_for, org, status, campus,
-    salutation, first_name, middle_name, surname,
-    (photo_base64 IS NOT NULL AND photo_base64 <> '') AS has_photo,
-    created_at
+    a.id, a.email, a.position_applied_for, a.org, a.status, a.campus,
+    a.salutation, a.first_name, a.middle_name, a.surname,
+    (a.photo_base64 IS NOT NULL AND a.photo_base64 <> '') AS has_photo,
+    a.created_at,
+    -- Repeat-candidate marker for the list's red dot. Counts EARLIER
+    -- applications from the same person across ALL campuses: a campus-scoped
+    -- user is allowed to know THAT someone applied before, just not where
+    -- or how it went. Same rule as _duplicate_lookup, so the dot can never
+    -- disclose more than the invite warning already does.
+    (SELECT COUNT(*) FROM bts_applications p
+       WHERE p.email IS NOT NULL AND p.email <> ''
+         AND lower(p.email) = lower(a.email)
+         AND p.id <> a.id
+         AND COALESCE(p.created_at, '-infinity') < COALESCE(a.created_at, '-infinity')
+    ) AS prior_count,
+    (SELECT MAX(p.created_at)::date FROM bts_applications p
+       WHERE p.email IS NOT NULL AND p.email <> ''
+         AND lower(p.email) = lower(a.email)
+         AND p.id <> a.id
+         AND COALESCE(p.created_at, '-infinity') < COALESCE(a.created_at, '-infinity')
+    ) AS prior_on
 """
 
 # Allowed status values — mirror the schema CHECK constraint.
@@ -364,8 +381,8 @@ def list_applications(
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                f"SELECT {_LIST_COLUMNS} FROM bts_applications "
-                f"{clause} ORDER BY created_at DESC NULLS LAST, id DESC",
+                f"SELECT {_LIST_COLUMNS} FROM bts_applications a "
+                f"{clause} ORDER BY a.created_at DESC NULLS LAST, a.id DESC",
                 params,
             )
             rows = cur.fetchall()
