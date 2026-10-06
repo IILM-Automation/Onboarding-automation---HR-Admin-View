@@ -144,6 +144,22 @@ export default function OfferLetterModal({
               </div>
             )}
 
+            {defaults.salary_refs.length > 0 && (
+              <div className="offer-salaryref">
+                <strong>On record:</strong>{" "}
+                {defaults.salary_refs.map((s, i) => (
+                  <span key={i}>
+                    {i > 0 && " · "}
+                    {s.label}: {s.value}
+                  </span>
+                ))}
+                <div className="offer-existing-note">
+                  These are usually recorded as monthly figures. Enter the ANNUAL CTC below —
+                  it is not prefilled on purpose.
+                </div>
+              </div>
+            )}
+
             <div className="offer-grid">
               <div className="salary-field offer-wide">
                 <label>Candidate name</label>
@@ -165,7 +181,9 @@ export default function OfferLetterModal({
                 </select>
               </div>
               <div className="salary-field">
-                <label>Annual CTC (₹)</label>
+                <label>
+                  Annual CTC (₹) <span className="offer-hint">annual, not monthly</span>
+                </label>
                 <input
                   inputMode="numeric"
                   value={ctc}

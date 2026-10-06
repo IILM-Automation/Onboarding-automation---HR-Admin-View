@@ -1167,8 +1167,8 @@ def offer_letter_defaults(
             cur.execute(
                 """
                 SELECT id, salutation, first_name, middle_name, surname, campus,
-                       status, ctc_offered, designation_offered, employment_type,
-                       date_of_joining
+                       status, ctc_offered, expected_salary, designation_offered,
+                       employment_type, date_of_joining
                 FROM bts_applications WHERE id = %s
                 """,
                 (app_id,),
@@ -1188,6 +1188,34 @@ def offer_letter_defaults(
             )
             existing = [_serialize(r) for r in cur.fetchall()]
 
+            # The appointment terms are agreed during the interview, so they
+            # live on the NOTES rows, not on bts_applications (whose
+            # designation_offered / date_of_joining are empty in practice).
+            # Take the most recent non-empty value for each field.
+            cur.execute(
+                """
+                SELECT designation_offered, date_of_joining, employment_type,
+                       recommended_salary
+                FROM bts_interview_notes
+                WHERE application_id = %s
+                ORDER BY COALESCE(round_no, 0) DESC, id DESC
+                """,
+                (app_id,),
+            )
+            note_rows = cur.fetchall()
+
+        def _latest(field: str):
+            for r in note_rows:
+                value = (r.get(field) or "") if isinstance(r.get(field), str) else r.get(field)
+                if value not in (None, ""):
+                    return r[field]
+            return None
+
+        note_designation = _latest("designation_offered")
+        note_doj = _latest("date_of_joining")
+        note_type = _latest("employment_type")
+        note_salary = _latest("recommended_salary")
+
         name = " ".join(
             p for p in (
                 app_row["salutation"], app_row["first_name"],
@@ -1195,25 +1223,36 @@ def offer_letter_defaults(
             ) if p and str(p).strip()
         ).strip()
 
-        # Strip anything non-numeric: ctc_offered is free text entered by HR.
-        ctc_raw = re.sub(r"[^\d.]", "", str(app_row["ctc_offered"] or ""))
-        try:
-            ctc = float(ctc_raw) if ctc_raw else None
-        except ValueError:
-            ctc = None
+        # CTC is deliberately NOT prefilled. The salary figures captured
+        # elsewhere (expected_salary, recommended_salary) are entered by HR as
+        # MONTHLY amounts in practice — 35000, 50000, 90000 — and this field is
+        # an ANNUAL CTC. Prefilling would silently print "Rs 35,000 per annum"
+        # on a real offer letter. They are surfaced as a labelled reference
+        # instead, so a human converts them deliberately.
+        def _as_text(value) -> str:
+            return str(value).strip() if value not in (None, "") else ""
+
+        salary_refs = [
+            {"label": "Expected (as stated by candidate)",
+             "value": _as_text(app_row["expected_salary"])},
+            {"label": "Recommended at interview", "value": _as_text(note_salary)},
+            {"label": "CTC offered (salary block)", "value": _as_text(app_row["ctc_offered"])},
+        ]
+        salary_refs = [s for s in salary_refs if s["value"]]
 
         campus = app_row["campus"]
+        doj = note_doj or app_row["date_of_joining"]
         return {
             "eligible": app_row["status"] in _OFFER_STATUSES,
             "status": app_row["status"],
             "campus": campus,
             "candidate_name": name,
-            "designation": app_row["designation_offered"] or "",
-            "employment_type": app_row["employment_type"] or "",
-            "ctc_annual": ctc,
-            "date_of_joining": (
-                app_row["date_of_joining"].isoformat() if app_row["date_of_joining"] else None
-            ),
+            # Interview notes win: that is where the agreed terms actually live.
+            "designation": note_designation or app_row["designation_offered"] or "",
+            "employment_type": note_type or app_row["employment_type"] or "",
+            "ctc_annual": None,
+            "salary_refs": salary_refs,
+            "date_of_joining": doj.isoformat() if doj else None,
             "school_address": _CAMPUS_ADDRESSES.get(campus or "", ""),
             "existing": existing,
         }

@@ -702,6 +702,10 @@ table.data tr:last-child td{border-bottom:none;}
 }
 .offer-existing-note{ color:var(--muted); font-size:11.5px; font-style:italic; margin-top:4px; }
 .offer-hint{ font-weight:400; color:var(--muted); text-transform:none; letter-spacing:0; }
+.offer-salaryref{
+  background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px;
+  padding:10px 12px; margin-bottom:14px; font-size:12.5px; line-height:1.6; color:#92400E;
+}
 
 .offer-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .offer-wide{ grid-column:1 / -1; }

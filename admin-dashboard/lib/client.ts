@@ -279,6 +279,10 @@ export interface OfferDefaults {
   designation: string;
   employment_type: string;
   ctc_annual: number | null;
+  /** Salary figures recorded elsewhere, shown for reference only. They are
+   *  entered as MONTHLY amounts in practice, so they are never prefilled
+   *  into the annual-CTC field. */
+  salary_refs: { label: string; value: string }[];
   date_of_joining: string | null;
   school_address: string;
   existing: IssuedOffer[];
