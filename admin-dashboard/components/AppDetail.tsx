@@ -15,10 +15,16 @@ import CareerTab from "./tabs/CareerTab";
 import NotesTab from "./tabs/NotesTab";
 import PrintView from "./PrintView";
 import NotesPrintView from "./NotesPrintView";
+import OfferLetterModal from "./OfferLetterModal";
+import OfferLetterPrintView from "./OfferLetterPrintView";
+import type { OfferLetter } from "@/lib/client";
 
-/** Print either the full application or just the interview notes.
+/** Statuses that unlock the offer letter. Mirrors _OFFER_STATUSES on the backend. */
+const OFFER_STATUSES: Status[] = ["active_file", "appointed"];
+
+/** Print the full application, the interview notes, or an offer letter.
  *  A body[data-print] attribute tells the print stylesheet which root to show. */
-function downloadPdf(mode: "full" | "notes") {
+function downloadPdf(mode: "full" | "notes" | "offer") {
   document.body.setAttribute("data-print", mode);
   const cleanup = () => {
     document.body.removeAttribute("data-print");
@@ -48,6 +54,9 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<TabKey>("overview");
   const [error, setError] = useState("");
+  // Offer letter: the form, and the issued letter held for printing.
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offer, setOffer] = useState<OfferLetter | null>(null);
 
   useEffect(() => {
     if (id === null) {
@@ -61,6 +70,8 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
     setTab("overview");
     setDetail(null);
     setPrintNotes([]);
+    setOffer(null);
+    setOfferOpen(false);
     setNotesLoading(true);
     fetchNotes(id)
       .then((n) => { if (!cancelled) setPrintNotes(n); })
@@ -136,6 +147,26 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
             <button className="btn-print btn-print-notes" onClick={() => downloadPdf("notes")} title="Download the interview notes as PDF">
               ⬇ Interview Notes PDF
             </button>
+            {/* Super-admin only, and only once the candidate reaches Active
+                File / Appointed. The backend enforces both independently. */}
+            {isAdmin && detail.status && OFFER_STATUSES.includes(detail.status) && (
+              <button
+                className="btn-print btn-offer"
+                onClick={() => setOfferOpen(true)}
+                title="Create an offer letter for this candidate"
+              >
+                ✎ Create Offer Letter
+              </button>
+            )}
+            {offer && (
+              <button
+                className="btn-print btn-offer-dl"
+                onClick={() => downloadPdf("offer")}
+                title={`Download offer letter ${offer.reference_no}`}
+              >
+                ⬇ Offer Letter PDF
+              </button>
+            )}
           </div>
 
           <div className="detail-header">
@@ -220,6 +251,21 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
           {/* Print roots — hidden on screen, shown in @media print by data-print mode */}
           <PrintView app={detail} notes={printNotes} />
           <NotesPrintView app={detail} notes={printNotes} />
+          <OfferLetterPrintView offer={offer} />
+
+          {offerOpen && (
+            <OfferLetterModal
+              appId={detail.id}
+              onClose={() => setOfferOpen(false)}
+              onGenerated={(o) => {
+                setOffer(o);
+                setOfferOpen(false);
+                // Straight to the print dialog — generating and then hunting
+                // for a second button is a step nobody wants.
+                setTimeout(() => downloadPdf("offer"), 150);
+              }}
+            />
+          )}
         </div>
       )}
     </main>

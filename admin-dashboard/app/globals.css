@@ -465,6 +465,7 @@ table.data tr:last-child td{border-bottom:none;}
 /* Print view is hidden on screen; only revealed when printing */
 .print-root{display:none;}
 .notes-print-root{display:none;}
+.offer-print-root{display:none;}
 .btn-print-notes{ background:var(--iilm); }
 
 @media print{
@@ -482,15 +483,19 @@ table.data tr:last-child td{border-bottom:none;}
 
   /* Hide every on-screen element; only a print root should show */
   .list-panel, .detail-toolbar, .detail-header, .tabs, .mobile-back, .nav-bar{ display:none !important; }
-  .detail-inner > *:not(.print-root):not(.notes-print-root){ display:none !important; }
+  .detail-inner > *:not(.print-root):not(.notes-print-root):not(.offer-print-root){
+    display:none !important;
+  }
 
   /* Choose which print root renders. Default (no data-print / "full") =
-     the full application; data-print="notes" = the interview-notes sheet. */
-  .print-root, .notes-print-root{ display:none !important; }
-  body:not([data-print="notes"]) .print-root{ display:block !important; }
+     the full application; "notes" = the interview-notes sheet;
+     "offer" = the offer letter. */
+  .print-root, .notes-print-root, .offer-print-root{ display:none !important; }
+  body:not([data-print="notes"]):not([data-print="offer"]) .print-root{ display:block !important; }
   body[data-print="notes"] .notes-print-root{ display:block !important; }
+  body[data-print="offer"] .offer-print-root{ display:block !important; }
 
-  .print-root, .notes-print-root{
+  .print-root, .notes-print-root, .offer-print-root{
     position:static !important; width:100% !important;
     color:#000; background:#fff; font-size:11px; line-height:1.4;
   }
@@ -679,6 +684,78 @@ table.data tr:last-child td{border-bottom:none;}
 
 /* Send turns red once HR is knowingly inviting a repeat candidate. */
 .btn-accent.btn-danger{ background:#DC2626; }
+
+/* ------------------------------------------------------------------
+   Offer letter — form modal (screen) and letter (print)
+   ------------------------------------------------------------------ */
+.offer-card{ max-width:620px; }
+.btn-offer{ background:#047857; }
+.btn-offer-dl{ background:#065F46; }
+
+.offer-blocked{
+  background:#FFFBEB; border:1px solid #FDE68A; color:#92400E;
+  padding:12px 14px; border-radius:10px; font-size:13px; line-height:1.5;
+}
+.offer-existing{
+  background:var(--bg); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; margin-bottom:14px; font-size:12.5px; line-height:1.6;
+}
+.offer-existing-note{ color:var(--muted); font-size:11.5px; font-style:italic; margin-top:4px; }
+.offer-hint{ font-weight:400; color:var(--muted); text-transform:none; letter-spacing:0; }
+
+.offer-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.offer-wide{ grid-column:1 / -1; }
+.offer-grid textarea{ resize:vertical; font:inherit; }
+
+.offer-preview{
+  margin-top:14px; padding:12px 14px; border-radius:10px;
+  background:#F0FDF4; border:1px solid #BBF7D0;
+}
+.offer-preview-head{
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  color:#166534; margin-bottom:8px;
+}
+.offer-preview-grid{
+  display:grid; grid-template-columns:1fr auto 1fr auto; gap:5px 14px; font-size:12.5px;
+}
+.offer-preview-grid span:nth-child(even){ text-align:right; font-weight:600; }
+.offer-neg{ color:#B91C1C; font-style:italic; font-weight:600; }
+
+@media (max-width:620px){
+  .offer-card{ max-width:100%; }
+  .offer-grid{ grid-template-columns:1fr; }
+  .offer-preview-grid{ grid-template-columns:1fr auto; }
+}
+
+/* ---- the printed letter ---- */
+.ol-page{ font-family:Georgia, "Times New Roman", serif; font-size:12px; line-height:1.65; color:#000; }
+/* Page 2 must start on its own sheet — this is a document that goes to a
+   candidate, so the annexure break is explicit, never incidental. */
+.ol-page-2{ break-before:page; page-break-before:always; }
+.ol-head{ text-align:center; border-bottom:2px solid #111; padding-bottom:10px; margin-bottom:18px; }
+.ol-school{ font-size:20px; font-weight:700; letter-spacing:.5px; }
+.ol-addr{ font-size:10.5px; color:#333; margin-top:4px; white-space:pre-line; }
+.ol-meta{ display:flex; justify-content:space-between; font-size:11px; margin-bottom:20px; }
+.ol-title{ font-size:15px; font-weight:700; text-align:center; text-decoration:underline;
+  text-transform:uppercase; letter-spacing:1px; margin:0 0 20px; }
+.ol-title-2{ margin-bottom:16px; }
+.ol-to{ margin:0 0 14px; }
+.ol-page p{ margin:0 0 12px; text-align:justify; }
+
+.ol-table{ width:100%; border-collapse:collapse; margin-top:6px; font-size:11.5px; }
+.ol-table th, .ol-table td{ border:1px solid #333; padding:7px 10px; }
+.ol-table th{ background:#F3F4F6; text-align:left; font-size:10.5px;
+  text-transform:uppercase; letter-spacing:.4px; }
+.ol-num{ text-align:right; white-space:nowrap; }
+.ol-subtotal td{ font-weight:700; background:#FAFAFA; }
+.ol-total td{ font-weight:700; background:#F3F4F6; border-top:2px solid #111; }
+.ol-foot-note{ font-size:10px !important; color:#333; margin-top:14px !important; line-height:1.5; }
+
+.ol-signatures{ display:flex; gap:48px; margin-top:46px; }
+.ol-sig{ flex:1; }
+.ol-sig-line{ border-top:1px solid #111; margin-bottom:6px; }
+.ol-sig-name{ font-size:11px; font-weight:700; }
+.ol-sig-sub{ font-size:10px; color:#444; }
 
 /* Repeat-candidate dot on the candidate list rows */
 .repeat-dot{

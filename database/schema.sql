@@ -277,3 +277,49 @@ CREATE INDEX IF NOT EXISTS idx_tokens_email_lower       ON bts_form_tokens  (low
 ALTER TABLE bts_form_tokens
     ADD COLUMN IF NOT EXISTS duplicate_ack BOOLEAN DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS duplicate_of  INTEGER REFERENCES bts_applications(id);
+
+
+-- ============================================================
+-- PART 8: OFFER LETTERS
+--
+-- Issued from the candidate detail view once the candidate reaches
+-- 'active_file' or 'appointed'. SUPER-ADMIN ONLY for now (enforced in
+-- backend/main.py, not by hiding the button) — campus rollout comes later.
+--
+-- Every figure that appears on the printed letter is FROZEN onto the row at
+-- issue time, including the whole salary breakdown. The percentages in
+-- _CTC_STRUCTURE will change eventually; a letter already in a candidate's
+-- hands must still be reproducible exactly as they received it. That also
+-- gives the forthcoming director e-signature flow a stable artifact to
+-- attach to and stamp, rather than something recomputed on the fly.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bts_offer_letters (
+    id               SERIAL PRIMARY KEY,
+    application_id   INTEGER NOT NULL REFERENCES bts_applications(id) ON DELETE CASCADE,
+    -- Human-facing reference, e.g. BTS/DEL/2026/0007. Unique across the org.
+    reference_no     TEXT NOT NULL UNIQUE,
+    campus           TEXT,
+
+    -- Snapshot of the letter's contents. Deliberately duplicated from
+    -- bts_applications: the candidate's record may be edited afterwards,
+    -- the issued letter may not.
+    candidate_name   TEXT NOT NULL,
+    designation      TEXT NOT NULL,
+    employment_type  TEXT,
+    ctc_annual       NUMERIC(12,2) NOT NULL,
+    date_of_joining  DATE,
+    school_address   TEXT,
+    -- Computed component figures (basic, hra, pf, gratuity, …) as issued.
+    breakdown        JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    issued_by        TEXT,
+    -- signed / declined are reserved for the director e-signature step.
+    status           TEXT NOT NULL DEFAULT 'issued'
+                     CHECK (status IN ('issued', 'signed', 'declined')),
+    created_at       TIMESTAMPTZ DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_offers_application ON bts_offer_letters(application_id);
+CREATE INDEX IF NOT EXISTS idx_offers_campus      ON bts_offer_letters(campus);
+CREATE INDEX IF NOT EXISTS idx_offers_created     ON bts_offer_letters(created_at);

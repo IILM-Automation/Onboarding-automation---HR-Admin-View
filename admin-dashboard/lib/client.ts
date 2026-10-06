@@ -241,6 +241,87 @@ export interface SalaryPayload {
   interview_rounds?: InterviewRound[];
 }
 
+/* ---------------- Offer letters (super-admin only) ---------------- */
+
+export interface BreakdownRow {
+  label: string;
+  annual: number;
+  monthly: number;
+}
+
+export interface CtcBreakdown {
+  ctc_annual: number;
+  ctc_monthly: number;
+  components: BreakdownRow[];
+  retirals: BreakdownRow[];
+  gross_annual: number;
+  gross_monthly: number;
+  structure: Record<string, number>;
+}
+
+/** A previously issued letter, as listed on the form. */
+export interface IssuedOffer {
+  id: number;
+  reference_no: string;
+  candidate_name: string;
+  designation: string;
+  ctc_annual: string | number;
+  date_of_joining?: string | null;
+  status: string;
+  created_at?: string | null;
+}
+
+export interface OfferDefaults {
+  eligible: boolean;
+  status: string;
+  campus: string | null;
+  candidate_name: string;
+  designation: string;
+  employment_type: string;
+  ctc_annual: number | null;
+  date_of_joining: string | null;
+  school_address: string;
+  existing: IssuedOffer[];
+}
+
+export interface OfferLetter {
+  success: boolean;
+  id: number;
+  reference_no: string;
+  created_at: string | null;
+  campus: string | null;
+  candidate_name: string;
+  designation: string;
+  employment_type: string | null;
+  date_of_joining: string | null;
+  school_address: string;
+  breakdown: CtcBreakdown;
+}
+
+export async function fetchOfferDefaults(appId: number): Promise<OfferDefaults> {
+  const res = await fetch(`/api/offer-letters/defaults/${appId}`, { cache: "no-store" });
+  return jsonOrThrow(res);
+}
+
+export async function createOfferLetter(
+  appId: number,
+  payload: {
+    candidate_name: string;
+    designation: string;
+    ctc_annual: number;
+    date_of_joining?: string;
+    employment_type?: string;
+    school_address?: string;
+  }
+): Promise<OfferLetter> {
+  const res = await fetch(`/api/applications/${appId}/offer-letter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return jsonOrThrow(res);
+}
+
 export async function updateSalary(
   id: number,
   payload: SalaryPayload

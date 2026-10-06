@@ -27,6 +27,7 @@ import json
 import os
 import re
 import urllib.request
+from datetime import datetime
 from typing import Optional
 
 import psycopg2
@@ -1010,3 +1011,300 @@ def create_invite(
         raise HTTPException(status_code=502, detail="The invite workflow rejected the request.")
 
     return {"success": True, "email": email, "campus": campus}
+
+
+# ============================================================
+# PART 5: OFFER LETTERS (require X-API-Key, SUPER-ADMIN ONLY)
+#
+# Issued once a candidate reaches 'active_file' or 'appointed'. Restricted
+# to the super-admin for now; campus rollout is a later decision, so the
+# restriction lives HERE rather than in the dashboard — hiding a button is
+# not access control.
+# ============================================================
+
+# Statuses that make a candidate eligible for an offer.
+_OFFER_STATUSES = {"active_file", "appointed"}
+
+# Reference-number campus codes, e.g. BTS/DEL/2026/0007.
+_CAMPUS_CODES = {"Delhi": "DEL", "Jaipur": "JAI", "Chandigarh": "CHD"}
+
+# PLACEHOLDER ADDRESSES — replace with the real registered addresses.
+# Kept server-side so the letter and any future server-rendered/signed copy
+# read from one source.
+_CAMPUS_ADDRESSES = {
+    "Delhi": "Banyan Tree School\n[Street address], New Delhi\n[PIN]",
+    "Jaipur": "Banyan Tree School\n[Street address], Jaipur, Rajasthan\n[PIN]",
+    "Chandigarh": "Banyan Tree School\n[Street address], Chandigarh\n[PIN]",
+}
+
+# Salary structure. Every ratio the letter depends on lives here so it can be
+# tuned without touching the maths. Changing these does NOT alter letters
+# already issued — each row freezes its own computed breakdown.
+_CTC_STRUCTURE = {
+    "basic_pct_of_ctc": 0.50,
+    "hra_pct_of_basic": 0.40,
+    "conveyance_annual": 19200.0,   # fixed
+    "pf_pct_of_basic": 0.12,        # employer contribution
+    "gratuity_pct_of_basic": 0.0481,
+}
+
+
+def _money(value: float) -> float:
+    """Round to 2dp. Letters show currency, not floating-point noise."""
+    return round(value + 0.0, 2)
+
+
+def compute_ctc_breakdown(ctc_annual: float) -> dict:
+    """Split an annual CTC into its components.
+
+    Special Allowance is the BALANCING figure, so the components always sum
+    back to exactly the CTC that was offered — an offer letter whose parts do
+    not add up to the headline number is worse than no letter at all.
+    """
+    s = _CTC_STRUCTURE
+    basic = _money(ctc_annual * s["basic_pct_of_ctc"])
+    hra = _money(basic * s["hra_pct_of_basic"])
+    conveyance = _money(s["conveyance_annual"])
+    pf = _money(basic * s["pf_pct_of_basic"])
+    gratuity = _money(basic * s["gratuity_pct_of_basic"])
+
+    special = _money(ctc_annual - (basic + hra + conveyance + pf + gratuity))
+    if special < 0:
+        # At very low CTC the fixed conveyance plus statutory contributions
+        # exceed what is left. Refuse rather than print a negative line item.
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This CTC is too low for the configured salary structure "
+                f"(the fixed components already exceed ₹{ctc_annual:,.0f}). "
+                "Raise the CTC or adjust the structure."
+            ),
+        )
+
+    gross = _money(basic + hra + conveyance + special)
+    components = [
+        {"label": "Basic Salary", "annual": basic},
+        {"label": "House Rent Allowance", "annual": hra},
+        {"label": "Conveyance Allowance", "annual": conveyance},
+        {"label": "Special Allowance", "annual": special},
+    ]
+    for c in components:
+        c["monthly"] = _money(c["annual"] / 12)
+
+    retirals = [
+        {"label": "Employer PF Contribution", "annual": pf, "monthly": _money(pf / 12)},
+        {"label": "Gratuity", "annual": gratuity, "monthly": _money(gratuity / 12)},
+    ]
+
+    return {
+        "ctc_annual": _money(ctc_annual),
+        "ctc_monthly": _money(ctc_annual / 12),
+        "components": components,
+        "retirals": retirals,
+        "gross_annual": gross,
+        "gross_monthly": _money(gross / 12),
+        "structure": dict(s),   # frozen with the letter, for reproducibility
+    }
+
+
+def _next_reference_no(cur, campus: Optional[str]) -> str:
+    """BTS/<CAMPUS>/<YEAR>/<NNNN>, sequential within campus+year.
+
+    Derived from the existing rows rather than a sequence so the numbering
+    stays contiguous and readable; the UNIQUE constraint on reference_no is
+    the real guard against a collision under concurrency.
+    """
+    code = _CAMPUS_CODES.get(campus or "", "GEN")
+    year = datetime.now().year
+    prefix = f"BTS/{code}/{year}/"
+    cur.execute(
+        "SELECT reference_no FROM bts_offer_letters "
+        "WHERE reference_no LIKE %s ORDER BY reference_no DESC LIMIT 1",
+        (prefix + "%",),
+    )
+    row = cur.fetchone()
+    nxt = 1
+    if row:
+        try:
+            nxt = int(str(row["reference_no"]).rsplit("/", 1)[1]) + 1
+        except (ValueError, IndexError):
+            nxt = 1
+    return f"{prefix}{nxt:04d}"
+
+
+class OfferLetterCreate(BaseModel):
+    candidate_name: str
+    designation: str
+    ctc_annual: float
+    date_of_joining: Optional[str] = None
+    employment_type: Optional[str] = None
+    school_address: Optional[str] = None
+
+
+def _require_super_admin(x_campus: Optional[str], x_role: Optional[str], what: str) -> None:
+    """Offer letters are super-admin only while the feature beds in."""
+    if _is_interviewer(x_role) or _campus_scope(x_campus) is not None:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only a super-admin can {what}.",
+        )
+
+
+@app.get("/offer-letters/defaults/{app_id}")
+def offer_letter_defaults(
+    app_id: int,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+):
+    """Prefill values for the offer-letter form, plus any already issued."""
+    require_api_key(x_api_key)
+    _require_super_admin(x_campus, x_role, "issue offer letters")
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, salutation, first_name, middle_name, surname, campus,
+                       status, ctc_offered, designation_offered, employment_type,
+                       date_of_joining
+                FROM bts_applications WHERE id = %s
+                """,
+                (app_id,),
+            )
+            app_row = cur.fetchone()
+            if app_row is None:
+                raise HTTPException(status_code=404, detail="application not found")
+
+            cur.execute(
+                """
+                SELECT id, reference_no, candidate_name, designation, ctc_annual,
+                       date_of_joining, status, created_at
+                FROM bts_offer_letters
+                WHERE application_id = %s ORDER BY created_at DESC
+                """,
+                (app_id,),
+            )
+            existing = [_serialize(r) for r in cur.fetchall()]
+
+        name = " ".join(
+            p for p in (
+                app_row["salutation"], app_row["first_name"],
+                app_row["middle_name"], app_row["surname"],
+            ) if p and str(p).strip()
+        ).strip()
+
+        # Strip anything non-numeric: ctc_offered is free text entered by HR.
+        ctc_raw = re.sub(r"[^\d.]", "", str(app_row["ctc_offered"] or ""))
+        try:
+            ctc = float(ctc_raw) if ctc_raw else None
+        except ValueError:
+            ctc = None
+
+        campus = app_row["campus"]
+        return {
+            "eligible": app_row["status"] in _OFFER_STATUSES,
+            "status": app_row["status"],
+            "campus": campus,
+            "candidate_name": name,
+            "designation": app_row["designation_offered"] or "",
+            "employment_type": app_row["employment_type"] or "",
+            "ctc_annual": ctc,
+            "date_of_joining": (
+                app_row["date_of_joining"].isoformat() if app_row["date_of_joining"] else None
+            ),
+            "school_address": _CAMPUS_ADDRESSES.get(campus or "", ""),
+            "existing": existing,
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/applications/{app_id}/offer-letter")
+def create_offer_letter(
+    app_id: int,
+    body: OfferLetterCreate,
+    x_api_key: Optional[str] = Header(None),
+    x_campus: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+):
+    """Issue an offer letter. SUPER-ADMIN ONLY.
+
+    Re-checks eligibility server-side: a tab left open since before the
+    candidate was rejected must not be able to issue an offer.
+    """
+    require_api_key(x_api_key)
+    _require_super_admin(x_campus, x_role, "issue offer letters")
+
+    name = (body.candidate_name or "").strip()
+    designation = (body.designation or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Candidate name is required.")
+    if not designation:
+        raise HTTPException(status_code=400, detail="Designation is required.")
+    if not body.ctc_annual or body.ctc_annual <= 0:
+        raise HTTPException(status_code=400, detail="A positive annual CTC is required.")
+
+    breakdown = compute_ctc_breakdown(float(body.ctc_annual))
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, campus, status FROM bts_applications WHERE id = %s",
+                (app_id,),
+            )
+            app_row = cur.fetchone()
+            if app_row is None:
+                raise HTTPException(status_code=404, detail="application not found")
+            if app_row["status"] not in _OFFER_STATUSES:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "An offer letter can only be issued once the candidate is "
+                        "marked Active File or Appointed."
+                    ),
+                )
+
+            campus = app_row["campus"]
+            address = (body.school_address or "").strip() or _CAMPUS_ADDRESSES.get(campus or "", "")
+            reference_no = _next_reference_no(cur, campus)
+
+            cur.execute(
+                """
+                INSERT INTO bts_offer_letters
+                    (application_id, reference_no, campus, candidate_name, designation,
+                     employment_type, ctc_annual, date_of_joining, school_address,
+                     breakdown, issued_by, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULLIF(%s,'')::date, %s, %s::jsonb, %s, 'issued')
+                RETURNING id, reference_no, created_at
+                """,
+                (
+                    app_id, reference_no, campus, name, designation,
+                    (body.employment_type or "").strip() or None,
+                    float(body.ctc_annual),
+                    (body.date_of_joining or "").strip(),
+                    address,
+                    json.dumps(breakdown),
+                    "super-admin",
+                ),
+            )
+            created = cur.fetchone()
+            conn.commit()
+
+        return {
+            "success": True,
+            "id": created["id"],
+            "reference_no": created["reference_no"],
+            "created_at": created["created_at"].isoformat() if created["created_at"] else None,
+            "campus": campus,
+            "candidate_name": name,
+            "designation": designation,
+            "employment_type": (body.employment_type or "").strip() or None,
+            "date_of_joining": (body.date_of_joining or "").strip() or None,
+            "school_address": address,
+            "breakdown": breakdown,
+        }
+    finally:
+        conn.close()
