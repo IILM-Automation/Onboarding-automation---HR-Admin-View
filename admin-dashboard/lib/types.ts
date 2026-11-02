@@ -30,6 +30,28 @@ export interface AppListItem {
   prior_count?: number | null;
   /** Date of the most recent earlier application, for the repeat marker. */
   prior_on?: string | null;
+  /** Matches in the imported recruitment history (bts_prior_candidates). */
+  prior_external?: number | null;
+  prior_external_on?: string | null;
+  /** Earlier applications sharing this mobile number (last 10 digits).
+   *  A weaker signal than email — a household can share a number — so the
+   *  UI shows these as a POSSIBLE repeat, visually distinct from a
+   *  confirmed email match. */
+  mobile_match_count?: number | null;
+  mobile_match_on?: string | null;
+}
+
+/** Another application that looks like the same person. Fields are null when
+ *  the record belongs to another campus — the backend strips them. */
+export interface RelatedApplication {
+  redacted: boolean;
+  id: number | null;
+  name: string | null;
+  campus: string | null;
+  status: Status | null;
+  applied_on: string | null;
+  by_email: boolean;
+  by_mobile: boolean;
 }
 
 export interface FamilyMember {
@@ -138,6 +160,8 @@ export interface InterviewRound {
 
 /** Full record returned by GET /applications/{id}. */
 export interface AppDetail extends AppListItem {
+  /** Other applications matching this one by email and/or mobile. */
+  related?: RelatedApplication[];
   date_of_birth?: string | null;
   age?: number | null;
   sex?: string | null;

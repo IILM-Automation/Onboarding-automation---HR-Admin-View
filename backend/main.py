@@ -191,6 +191,15 @@ def open_token(token: str):
 # ============================================================
 
 # Columns returned in the list view — kept lean (no JSONB blobs, no photo).
+# Phone numbers arrive as "9517822772", "07991256684", "+91 98765 43210" …
+# Comparing the last 10 digits is what makes those the same person.
+def _mobile_key(alias: str) -> str:
+    return f"right(regexp_replace(COALESCE({alias}.mobile,''), '[^0-9]', '', 'g'), 10)"
+
+
+_MOBILE_KEY_A = _mobile_key("a")
+_MOBILE_KEY_M = _mobile_key("m")
+
 _LIST_COLUMNS = """
     a.id, a.email, a.position_applied_for, a.org, a.status, a.campus,
     a.salutation, a.first_name, a.middle_name, a.surname,
@@ -212,7 +221,36 @@ _LIST_COLUMNS = """
          AND lower(p.email) = lower(a.email)
          AND p.id <> a.id
          AND COALESCE(p.created_at, '-infinity') < COALESCE(a.created_at, '-infinity')
-    ) AS prior_on
+    ) AS prior_on,
+    -- Imported recruitment history (schema PART 9). Counted across all
+    -- campuses, exactly like prior_count: a campus-scoped user may know THAT
+    -- someone was seen before, never where.
+    (SELECT COUNT(*) FROM bts_prior_candidates x
+       WHERE a.email IS NOT NULL AND a.email <> ''
+         AND lower(x.email) = lower(a.email)
+    ) AS prior_external,
+    (SELECT MAX(x.interviewed_on) FROM bts_prior_candidates x
+       WHERE a.email IS NOT NULL AND a.email <> ''
+         AND lower(x.email) = lower(a.email)
+    ) AS prior_external_on,
+    -- Same person, different email address. Matched on the LAST 10 DIGITS of
+    -- the mobile because the same number is stored as 9517822772, 07991256684
+    -- and +91… across the data. Counts EARLIER applications only, mirroring
+    -- prior_count, so the first visit is not itself marked a repeat.
+    -- This is a WEAKER signal than email (a household can share a number), so
+    -- the UI presents it as a possible match, never as a confirmed one.
+    (SELECT COUNT(*) FROM bts_applications m
+       WHERE m.id <> a.id
+         AND length(""" + _MOBILE_KEY_A + """) >= 10
+         AND """ + _MOBILE_KEY_M + """ = """ + _MOBILE_KEY_A + """
+         AND COALESCE(m.created_at, '-infinity') < COALESCE(a.created_at, '-infinity')
+    ) AS mobile_match_count,
+    (SELECT MAX(m.created_at)::date FROM bts_applications m
+       WHERE m.id <> a.id
+         AND length(""" + _MOBILE_KEY_A + """) >= 10
+         AND """ + _MOBILE_KEY_M + """ = """ + _MOBILE_KEY_A + """
+         AND COALESCE(m.created_at, '-infinity') < COALESCE(a.created_at, '-infinity')
+    ) AS mobile_match_on
 """
 
 # Allowed status values — mirror the schema CHECK constraint.
@@ -392,6 +430,67 @@ def list_applications(
         conn.close()
 
 
+def _related_applications(cur, row: dict, scope: Optional[str]) -> list:
+    """Other applications that look like the same person.
+
+    Two independent signals, reported separately because they carry very
+    different confidence:
+      email  — effectively certain, the key the whole feature is built on.
+      mobile — a strong hint, but a household can share a number, so it is
+               surfaced as a POSSIBLE match and never asserted as the same
+               person.
+
+    Campus isolation applies exactly as it does to the invite warning: a
+    campus-scoped caller learns THAT a related record exists and when, but
+    not where, whose, or how it went.
+    """
+    email = (row.get("email") or "").strip().lower()
+    mobile_digits = re.sub(r"[^0-9]", "", row.get("mobile") or "")
+    mobile_key = mobile_digits[-10:] if len(mobile_digits) >= 10 else None
+    if not email and not mobile_key:
+        return []
+
+    cur.execute(
+        """
+        SELECT id, campus, status, created_at::date AS applied_on,
+               salutation, first_name, middle_name, surname,
+               (%s <> '' AND lower(COALESCE(email,'')) = %s) AS by_email,
+               (%s IS NOT NULL AND right(regexp_replace(COALESCE(mobile,''),
+                    '[^0-9]', '', 'g'), 10) = %s) AS by_mobile
+        FROM bts_applications
+        WHERE id <> %s
+          AND (
+                (%s <> '' AND lower(COALESCE(email,'')) = %s)
+             OR (%s IS NOT NULL AND right(regexp_replace(COALESCE(mobile,''),
+                    '[^0-9]', '', 'g'), 10) = %s)
+          )
+        ORDER BY created_at DESC NULLS LAST, id DESC
+        LIMIT 20
+        """,
+        (email, email, mobile_key, mobile_key, row["id"],
+         email, email, mobile_key, mobile_key),
+    )
+
+    out = []
+    for r in cur.fetchall():
+        own = scope is None or r["campus"] == scope
+        name = " ".join(
+            p for p in (r["salutation"], r["first_name"], r["middle_name"], r["surname"])
+            if p and str(p).strip()
+        ).strip()
+        out.append({
+            "redacted": not own,
+            "id": r["id"] if own else None,
+            "name": name if own else None,
+            "campus": r["campus"] if own else None,
+            "status": r["status"] if own else None,
+            "applied_on": r["applied_on"].isoformat() if r["applied_on"] else None,
+            "by_email": bool(r["by_email"]),
+            "by_mobile": bool(r["by_mobile"]),
+        })
+    return out
+
+
 @app.get("/applications/{app_id}")
 def get_application(
     app_id: int,
@@ -421,11 +520,13 @@ def get_application(
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params)
             row = cur.fetchone()
-        if row is None:
-            raise HTTPException(status_code=404, detail="application not found")
+            if row is None:
+                raise HTTPException(status_code=404, detail="application not found")
+            related = _related_applications(cur, row, scope)
         out = _serialize(row)
         if _is_interviewer(x_role):
             out = _strip_salary(out)
+        out["related"] = related
         return out
     finally:
         conn.close()
@@ -814,6 +915,20 @@ def _duplicate_lookup(cur, email: str, scope: Optional[str]) -> dict:
     )
     token_rows = cur.fetchall()
 
+    # Recruitment history imported from the campus's own spreadsheets, for
+    # people approached before this system existed (schema PART 9).
+    cur.execute(
+        """
+        SELECT campus, interviewed_on, position_applied, source
+        FROM bts_prior_candidates
+        WHERE lower(email) = %s
+        ORDER BY interviewed_on DESC NULLS LAST, id DESC
+        LIMIT 20
+        """,
+        (email,),
+    )
+    prior_rows = cur.fetchall()
+
     def _own(campus: Optional[str]) -> bool:
         return scope is None or campus == scope
 
@@ -855,12 +970,26 @@ def _duplicate_lookup(cur, email: str, scope: Optional[str]) -> dict:
 
     invites = list(own_buckets.values()) + ([other] if other["count"] else [])
 
+    prior = [
+        {
+            "redacted": not _own(r["campus"]),
+            "campus": r["campus"] if _own(r["campus"]) else None,
+            "interviewed_on": r["interviewed_on"].isoformat() if r["interviewed_on"] else None,
+            "position": r["position_applied"] if _own(r["campus"]) else None,
+            "source": r["source"],
+        }
+        for r in prior_rows
+    ]
+
     return {
-        "duplicate": bool(applications or invites),
+        "duplicate": bool(applications or invites or prior),
         "email": email,
-        "severity": "high" if applications else ("low" if invites else "none"),
+        # Imported history means the person was actually called in before, so
+        # it carries the same weight as a prior application here.
+        "severity": "high" if (applications or prior) else ("low" if invites else "none"),
         "applications": applications,
         "invites": invites,
+        "prior": prior,
     }
 
 
@@ -869,6 +998,7 @@ _EMPTY_LOOKUP = {
     "severity": "none",
     "applications": [],
     "invites": [],
+    "prior": [],
 }
 
 

@@ -323,3 +323,46 @@ CREATE TABLE IF NOT EXISTS bts_offer_letters (
 CREATE INDEX IF NOT EXISTS idx_offers_application ON bts_offer_letters(application_id);
 CREATE INDEX IF NOT EXISTS idx_offers_campus      ON bts_offer_letters(campus);
 CREATE INDEX IF NOT EXISTS idx_offers_created     ON bts_offer_letters(created_at);
+
+
+-- ============================================================
+-- PART 9: PRIOR CANDIDATES (imported recruitment history)
+--
+-- Candidates who were approached for interview BEFORE this system existed,
+-- imported from the campus's own recruitment spreadsheets. They never had a
+-- token or an application here, so repeat detection could not see them --
+-- which defeated the point of the feature for anyone who applied last year.
+--
+-- Deliberately a separate table rather than skeleton rows in
+-- bts_applications: these are historical references, not candidates in the
+-- pipeline. Mixing them in would distort every dashboard count, status
+-- filter and campus list, and could not be rolled back cleanly.
+--
+-- Only rows with a VALID email and evidence the candidate was actually
+-- approached are imported. Nothing is repaired or inferred: a truncated
+-- address is dropped, because a wrong one can never match the real person
+-- while still looking like coverage.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bts_prior_candidates (
+    id               SERIAL PRIMARY KEY,
+    email            TEXT NOT NULL,
+    name             TEXT,
+    position_applied TEXT,
+    contact          TEXT,
+    campus           TEXT,
+    interviewed_on   DATE,
+    -- Which sheet this came from, e.g. 'interview-list-2025-26'.
+    source           TEXT NOT NULL,
+    -- Page / serial number in that sheet, so any row can be traced back.
+    source_row       TEXT,
+    notes            TEXT,
+    imported_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- One row per person per source sheet, so the import is re-runnable: a later
+-- pass over a better export (e.g. the original CSV) updates rows instead of
+-- duplicating them.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prior_email_source
+    ON bts_prior_candidates (lower(email), source);
+CREATE INDEX IF NOT EXISTS idx_prior_email  ON bts_prior_candidates (lower(email));
+CREATE INDEX IF NOT EXISTS idx_prior_campus ON bts_prior_candidates (campus);

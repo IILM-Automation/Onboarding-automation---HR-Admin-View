@@ -126,6 +126,7 @@ export default function Dashboard({ session, onLogout }: { session: Session; onL
         onBack={() => setShowDetail(false)}
         onStatusChange={patchLocalStatus}
         onCampusChange={patchLocalCampus}
+        onSelect={selectApp}
       />
 
       {inviteOpen && (

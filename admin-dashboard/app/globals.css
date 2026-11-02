@@ -761,12 +761,63 @@ table.data tr:last-child td{border-bottom:none;}
 .ol-sig-name{ font-size:11px; font-weight:700; }
 .ol-sig-sub{ font-size:10px; color:#444; }
 
-/* Repeat-candidate dot on the candidate list rows */
+/* Repeat-candidate dot on the candidate list rows.
+   Red  = confirmed (same email, or a match in the recruitment records).
+   Amber= possible  (mobile number only -- a household can share one). */
 .repeat-dot{
   display:inline-block; width:7px; height:7px; border-radius:50%;
-  background:#DC2626; margin-right:7px; vertical-align:middle;
-  flex-shrink:0;
+  margin-right:7px; vertical-align:middle; flex-shrink:0;
+  background:#DC2626;
 }
+.repeat-dot-confirmed{ background:#DC2626; }
+.repeat-dot-possible{
+  background:#F59E0B;
+  box-shadow:0 0 0 2px rgba(245,158,11,.22);
+}
+
+/* "Same person?" banner on the candidate detail */
+.related-banner{
+  border-radius:12px; padding:12px 14px; margin-bottom:18px;
+}
+.related-confirmed{ background:#FEF2F2; border:1px solid #FECACA; }
+.related-possible { background:#FFFBEB; border:1px solid #FDE68A; }
+.related-head{ display:flex; align-items:center; gap:9px; margin-bottom:9px; }
+.related-icon{
+  flex-shrink:0; width:20px; height:20px; border-radius:50%; color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:12px; line-height:1;
+}
+.related-confirmed .related-icon{ background:#DC2626; }
+.related-possible  .related-icon{ background:#F59E0B; }
+.related-title{ font-size:13px; font-weight:700; }
+.related-confirmed .related-title{ color:#991B1B; }
+.related-possible  .related-title{ color:#92400E; }
+
+.related-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
+.related-list li{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  font-size:12.5px; line-height:1.45; color:#1F2937;
+}
+.related-redacted{ font-style:italic; color:var(--muted); }
+.related-tag{
+  flex-shrink:0; font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.4px; padding:2px 7px; border-radius:20px; color:#fff;
+}
+.related-tag-email { background:#DC2626; }
+.related-tag-mobile{ background:#F59E0B; }
+.related-open{
+  margin-left:auto; background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; font:inherit; font-size:11.5px; font-weight:600;
+  padding:3px 10px; cursor:pointer; color:var(--muted);
+}
+.related-open:hover{ border-color:var(--muted); color:#111827; }
+.related-note{
+  font-size:11px; color:var(--muted); margin:10px 0 0;
+  padding-top:9px; border-top:1px dashed rgba(0,0,0,.12); line-height:1.5;
+}
+
+/* The banner is screen-only context, never part of a printed document. */
+@media print{ .related-banner{ display:none !important; } }
 
 @media (max-width:520px){
   .invite-card{ max-width:100%; }

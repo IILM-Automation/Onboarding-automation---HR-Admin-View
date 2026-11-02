@@ -4,6 +4,49 @@ import type { AppListItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/types";
 import { fmtDate, fullName, relativeDate, statusVar, has } from "@/lib/format";
 
+/**
+ * How confident are we that this candidate is a repeat?
+ *   confirmed — same email, or a match in the imported recruitment records.
+ *   possible  — only the mobile number matches. Strong, but a household can
+ *               share a number, so it is never asserted as the same person.
+ *   null      — no signal.
+ */
+function repeatFlag(a: AppListItem): { level: "confirmed" | "possible"; title: string } | null {
+  const earlier = a.prior_count ?? 0;
+  const external = a.prior_external ?? 0;
+  const byMobile = a.mobile_match_count ?? 0;
+  const parts: string[] = [];
+
+  if (earlier > 0) {
+    parts.push(
+      `applied before${a.prior_on ? ` on ${fmtDate(a.prior_on)}` : ""}` +
+        (earlier > 1 ? ` (${earlier} earlier applications)` : "")
+    );
+  }
+  if (external > 0) {
+    parts.push(
+      `interviewed before${a.prior_external_on ? ` on ${fmtDate(a.prior_external_on)}` : ""}` +
+        " (recruitment records)"
+    );
+  }
+  const confirmed = parts.length > 0;
+
+  if (byMobile > 0) {
+    parts.push(
+      `same contact number as an earlier application${
+        a.mobile_match_on ? ` from ${fmtDate(a.mobile_match_on)}` : ""
+      }`
+    );
+  }
+  if (!parts.length) return null;
+
+  const now = a.created_at ? `; this application ${fmtDate(a.created_at)}` : "";
+  return {
+    level: confirmed ? "confirmed" : "possible",
+    title: `${confirmed ? "Repeat candidate" : "Possible repeat"} — ${parts.join("; ")}${now}`,
+  };
+}
+
 const CAMPUSES = ["Delhi", "Jaipur", "Chandigarh"];
 
 interface Props {
@@ -111,18 +154,16 @@ export default function AppList(p: Props) {
             >
               <span className="card-main">
                 <span className="card-name">
-                  {(a.prior_count ?? 0) > 0 && (
-                    <span
-                      className="repeat-dot"
-                      title={
-                        `Repeat candidate — applied before` +
-                        (a.prior_on ? ` on ${fmtDate(a.prior_on)}` : "") +
-                        (a.created_at ? `, this application ${fmtDate(a.created_at)}` : "") +
-                        ((a.prior_count ?? 0) > 1 ? ` (${a.prior_count} earlier applications)` : "")
-                      }
-                      aria-label="Repeat candidate"
-                    />
-                  )}
+                  {(() => {
+                    const flag = repeatFlag(a);
+                    return flag ? (
+                      <span
+                        className={`repeat-dot repeat-dot-${flag.level}`}
+                        title={flag.title}
+                        aria-label={flag.title}
+                      />
+                    ) : null;
+                  })()}
                   {fullName(a)}
                 </span>
                 <span className="card-pos">{has(a.position_applied_for) ? a.position_applied_for : "—"}</span>

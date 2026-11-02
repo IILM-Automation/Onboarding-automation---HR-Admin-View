@@ -1,6 +1,11 @@
 "use client";
 
-import type { DuplicateCheck, PriorApplication, PriorInvites } from "@/lib/client";
+import type {
+  DuplicateCheck,
+  PriorApplication,
+  PriorExternal,
+  PriorInvites,
+} from "@/lib/client";
 import { STATUS_LABELS } from "@/lib/types";
 import type { Status } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
@@ -45,6 +50,20 @@ function describeInvites(i: PriorInvites): string {
   return `${lead} · ${i.has_pending ? "a link is still active" : "never completed the form"}`;
 }
 
+/** Human label for the sheet a historical record was imported from. */
+const SOURCE_LABELS: Record<string, string> = {
+  "interview-list-2025-26": "2025-26 recruitment records",
+  "form-responses-2025": "2025 application records",
+};
+
+function describePrior(p: PriorExternal): string {
+  const when = p.interviewed_on ? fmtDate(p.interviewed_on) : "an earlier date";
+  const parts = [`Approached for interview at ${where(p)} on ${when}`];
+  if (p.position) parts.push(p.position);
+  parts.push(SOURCE_LABELS[p.source] ?? "imported records");
+  return parts.join(" · ");
+}
+
 /** Green all-clear line shown once a new candidate has been checked. */
 export function DuplicateClear() {
   return (
@@ -59,8 +78,16 @@ export function DuplicateClear() {
 
 export default function DuplicateHistory({ check }: { check: DuplicateCheck }) {
   const high = check.severity === "high";
+  const prior = check.prior ?? [];
   const anyRedacted =
-    check.applications.some((a) => a.redacted) || check.invites.some((v) => v.redacted);
+    check.applications.some((a) => a.redacted) ||
+    check.invites.some((v) => v.redacted) ||
+    prior.some((p) => p.redacted);
+  const title = check.applications.length
+    ? "This candidate has applied before"
+    : prior.length
+      ? "This candidate was interviewed before"
+      : "This candidate has been invited before";
 
   return (
     <div className={`dup-panel ${high ? "dup-high" : "dup-low"}`} role="status">
@@ -68,12 +95,16 @@ export default function DuplicateHistory({ check }: { check: DuplicateCheck }) {
         <span className="dup-icon" aria-hidden="true">
           {high ? "!" : "i"}
         </span>
-        <span className="dup-title">
-          {high ? "This candidate has applied before" : "This candidate has been invited before"}
-        </span>
+        <span className="dup-title">{title}</span>
       </div>
 
       <ul className="dup-list">
+        {prior.map((p, i) => (
+          <li key={`p${i}`} className={`dup-row${p.redacted ? " dup-redacted" : ""}`}>
+            <span className="dup-dot" aria-hidden="true" />
+            <span>{describePrior(p)}</span>
+          </li>
+        ))}
         {check.applications.map((a, i) => (
           <li key={`a${i}`} className={`dup-row${a.redacted ? " dup-redacted" : ""}`}>
             <span className="dup-dot" aria-hidden="true" />

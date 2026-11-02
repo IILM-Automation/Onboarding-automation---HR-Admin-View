@@ -17,6 +17,7 @@ import PrintView from "./PrintView";
 import NotesPrintView from "./NotesPrintView";
 import OfferLetterModal from "./OfferLetterModal";
 import OfferLetterPrintView from "./OfferLetterPrintView";
+import RelatedBanner from "./RelatedBanner";
 import type { OfferLetter } from "@/lib/client";
 
 /** Statuses that unlock the offer letter. Mirrors _OFFER_STATUSES on the backend. */
@@ -42,9 +43,18 @@ interface Props {
   onBack: () => void;
   onStatusChange: (id: number, status: Status) => void;
   onCampusChange: (id: number, campus: string) => void;
+  /** Jump to another application (used by the duplicate banner). */
+  onSelect: (id: number) => void;
 }
 
-export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampusChange }: Props) {
+export default function AppDetail({
+  id,
+  isAdmin,
+  onBack,
+  onStatusChange,
+  onCampusChange,
+  onSelect,
+}: Props) {
   const toast = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   // Notes live in their own table now. Fetched ONCE here and shared with both
@@ -219,6 +229,10 @@ export default function AppDetail({ id, isAdmin, onBack, onStatusChange, onCampu
               <img className="dh-photo" src={detail.photo_base64 as string} alt="candidate photo" />
             )}
           </div>
+
+          {detail.related && detail.related.length > 0 && (
+            <RelatedBanner related={detail.related} onOpen={onSelect} />
+          )}
 
           <div className="tabs">
             <button className={`tab${tab === "overview" ? " active" : ""}`} onClick={() => setTab("overview")}>

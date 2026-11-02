@@ -110,13 +110,24 @@ export interface PriorInvites {
   has_pending: boolean;
 }
 
+/** A candidate approached for interview before this system existed,
+ *  imported from the campus's own recruitment spreadsheets. */
+export interface PriorExternal {
+  redacted: boolean;
+  campus: string | null;
+  interviewed_on: string | null;
+  position: string | null;
+  source: string;
+}
+
 export interface DuplicateCheck {
   duplicate: boolean;
   email?: string;
-  /** high = a real prior application, low = invites only, none = new. */
+  /** high = a real prior application or imported history, low = invites only. */
   severity: "high" | "low" | "none";
   applications: PriorApplication[];
   invites: PriorInvites[];
+  prior: PriorExternal[];
 }
 
 const NO_DUPLICATE: DuplicateCheck = {
@@ -124,6 +135,7 @@ const NO_DUPLICATE: DuplicateCheck = {
   severity: "none",
   applications: [],
   invites: [],
+  prior: [],
 };
 
 /** Thrown when the backend refuses an un-acknowledged duplicate (HTTP 409). */
